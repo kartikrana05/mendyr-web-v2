@@ -112,7 +112,7 @@ npm run dev          # http://localhost:3000
 Point at a different backend with `BACKEND_URL` (see `.env.example`):
 
 ```bash
-BACKEND_URL=https://<your-app>.fastapicloud.app npm run dev
+BACKEND_URL=https://<your-app>.fastapicloud.dev npm run dev
 ```
 
 Demo accounts from the backend seed (password `Demo@12345`): `asha.patel.demo@mendyr.app`
@@ -124,7 +124,7 @@ Checks: `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 
 1. Import this repository in Vercel (framework preset: Next.js — no build settings to change).
 2. Add the environment variable `BACKEND_URL` = your FastAPI Cloud URL, e.g.
-   `https://mendyr.fastapicloud.app` (no trailing slash). The build fails with a clear message
+   `https://mendyr.fastapicloud.dev` (no trailing slash). The build fails with a clear message
    if it's missing.
 3. Deploy.
 

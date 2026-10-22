@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { Icon, type IconName } from "@/components/icons";
@@ -7,12 +8,8 @@ import type { ProfessionalType } from "@/lib/types";
 export function Logo({ href = "/", className }: { href?: string; className?: string }) {
   return (
     <Link href={href} className={cn("inline-flex items-center gap-2", className)} aria-label="Mendyr home">
-      <span className="flex size-8 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
-        <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        </svg>
-      </span>
-      <span className="text-lg font-bold tracking-tight text-slate-900">Mendyr</span>
+      <Image src="/mendyr.png" alt="" width={36} height={36} priority className="size-9" />
+      <span className="font-display text-xl font-bold tracking-tight text-slate-900">Mendyr</span>
     </Link>
   );
 }

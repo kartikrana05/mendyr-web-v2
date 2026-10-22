@@ -1,19 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand: a calm clinical teal. Change these to re-skin the whole app. */
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-200: #99f6e4;
-  --color-brand-300: #5eead4;
-  --color-brand-400: #2dd4bf;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-800: #115e59;
-  --color-brand-900: #134e4a;
+  /* Brand: the Mendyr deep blue (matches the original Mendyr app). 600 is the primary
+     #1262E2, 400 its light tint #63B0F2, 700 its dark shade #0F4ABF. Change these to
+     re-skin the whole app. */
+  --color-brand-50: #eef5fe;
+  --color-brand-100: #dbe9fd;
+  --color-brand-200: #bed7fb;
+  --color-brand-300: #91c1f7;
+  --color-brand-400: #63b0f2;
+  --color-brand-500: #3a86ea;
+  --color-brand-600: #1262e2;
+  --color-brand-700: #0f4abf;
+  --color-brand-800: #123f99;
+  --color-brand-900: #14377a;
+
+  /* Supporting tokens from the original theme. */
+  --color-accent: #2165bf;
+  --color-background: #f7f9fc;
 }
 
 :root {
@@ -21,7 +28,31 @@
 }
 
 body {
-  background: var(--color-slate-50);
+  background-color: var(--color-background);
+  /* The original app's faint 48px grid over a soft vertical wash. */
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
+    linear-gradient(180deg, hsl(220 33% 98%), hsl(220 33% 96%));
+  background-size:
+    48px 48px,
+    48px 48px,
+    100% 100%;
+  color: var(--color-slate-900);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: rgb(18 98 226 / 0.3);
   color: var(--color-slate-900);
 }
 

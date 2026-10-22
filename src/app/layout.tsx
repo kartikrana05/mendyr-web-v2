@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 
 import { ToastProvider } from "@/components/toast";
 import { AuthProvider } from "@/lib/auth";
 
 import "./globals.css";
 
-const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
+// Same pairing as the original Mendyr app: Inter for text, Outfit for headings.
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
+const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "Mendyr — Healthcare at home", template: "%s · Mendyr" },
@@ -15,12 +17,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d9488",
+  themeColor: "#F7F9FC",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${outfit.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
         <AuthProvider>
           <ToastProvider>{children}</ToastProvider>

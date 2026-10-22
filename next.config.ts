@@ -8,7 +8,7 @@ const BACKEND_URL = (process.env.BACKEND_URL ?? "http://127.0.0.1:8000").replace
 if (process.env.VERCEL && !process.env.BACKEND_URL) {
   throw new Error(
     "BACKEND_URL is not set. Add it in Vercel → Project → Settings → Environment Variables " +
-      "(e.g. https://<your-app>.fastapicloud.app).",
+      "(e.g. https://<your-app>.fastapicloud.dev).",
   );
 }
 
