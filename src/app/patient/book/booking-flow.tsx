@@ -151,7 +151,7 @@ export function BookingFlow() {
       // This page stays mounted (hidden) after navigating away; leave it fresh for next time.
       setPickedTime(null);
       setNotes("");
-      router.push(`/patient/bookings/${booking.id}`);
+      router.push(`/patient/bookings/view?id=${booking.id}`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {

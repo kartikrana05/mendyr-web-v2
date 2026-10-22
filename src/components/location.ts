@@ -2,6 +2,7 @@
 
 import { api, query } from "@/lib/api";
 import { INDIAN_STATES } from "@/lib/constants";
+import { IS_APP } from "@/lib/platform";
 import type { GeoAddress, GeoLocation } from "@/lib/types";
 
 export interface Coords {
@@ -11,8 +12,34 @@ export interface Coords {
   precision?: GeoLocation["precision"];
 }
 
-/** The browser's current position. Rejects with a human-readable message. */
-export function currentPosition(): Promise<{ latitude: number; longitude: number }> {
+/** The device's current position. Rejects with a human-readable message. */
+export async function currentPosition(): Promise<{ latitude: number; longitude: number }> {
+  if (IS_APP) {
+    const { Capacitor } = await import("@capacitor/core");
+    if (Capacitor.isNativePlatform()) return nativePosition();
+  }
+  return browserPosition();
+}
+
+/** In the app: the OS permission prompt and GPS, not the WebView's "localhost wants…" dialog. */
+async function nativePosition(): Promise<{ latitude: number; longitude: number }> {
+  const { Geolocation } = await import("@capacitor/geolocation");
+  const unavailable = new Error("Couldn't get your location — enter the pincode instead.");
+  const permission = await Geolocation.requestPermissions({ permissions: ["location"] }).catch(() => {
+    throw unavailable;
+  });
+  if (permission.location === "denied") {
+    throw new Error("Location access is off for Mendyr — turn it on in Settings, or enter the pincode.");
+  }
+  const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 }).catch(
+    () => {
+      throw unavailable;
+    },
+  );
+  return { latitude: position.coords.latitude, longitude: position.coords.longitude };
+}
+
+function browserPosition(): Promise<{ latitude: number; longitude: number }> {
   return new Promise((resolve, reject) => {
     if (!("geolocation" in navigator)) {
       reject(new Error("Your browser can't share your location — enter the pincode instead."));

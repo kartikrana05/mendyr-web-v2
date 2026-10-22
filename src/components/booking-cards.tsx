@@ -10,7 +10,7 @@ import type { BookingListItem, BookingStatus } from "@/lib/types";
 export function PatientBookingRow({ booking }: { booking: BookingListItem }) {
   return (
     <Link
-      href={`/patient/bookings/${booking.id}`}
+      href={`/patient/bookings/view?id=${booking.id}`}
       className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition hover:border-brand-300"
     >
       <div className="min-w-0 flex-1">

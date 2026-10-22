@@ -1,9 +1,11 @@
+import { AppWelcome } from "@/components/app-welcome";
 import { ProfessionIcon } from "@/components/brand";
 import { Icon, type IconName } from "@/components/icons";
 import { ServiceShowcase } from "@/components/service-catalog";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { Avatar, Badge, ButtonLink } from "@/components/ui";
 import { PROFESSIONAL_SHARE_PCT } from "@/lib/constants";
+import { IS_APP } from "@/lib/platform";
 
 const STEPS: { icon: IconName; title: string; body: string }[] = [
   {
@@ -42,6 +44,8 @@ const PRO_POINTS: { icon: IconName; title: string; body: string }[] = [
 ];
 
 export default function HomePage() {
+  // The app build opens on a native-style welcome screen; the website on the marketing page.
+  if (IS_APP) return <AppWelcome />;
   return (
     <>
       <SiteHeader />

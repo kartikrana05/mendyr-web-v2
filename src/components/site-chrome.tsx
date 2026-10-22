@@ -10,7 +10,7 @@ import { homeFor, useAuth } from "@/lib/auth";
 export function SiteHeader() {
   const { user, loading } = useAuth();
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 pt-[var(--safe-top)] backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Logo />
         <nav className="hidden items-center gap-7 text-sm font-medium text-slate-600 md:flex">

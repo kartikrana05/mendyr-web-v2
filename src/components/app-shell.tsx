@@ -58,8 +58,8 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: React.Re
   }
 
   return (
-    <div className="min-h-screen pb-20 sm:pb-0">
-      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur">
+    <div className="min-h-dvh pb-[calc(5rem+var(--safe-bottom))] sm:pb-0">
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 pt-[var(--safe-top)] backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Logo href={nav[0]?.href ?? "/"} />
           <nav className="hidden items-center gap-1 sm:flex">
@@ -82,6 +82,7 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: React.Re
             <button
               type="button"
               onClick={handleLogout}
+              aria-label="Log out"
               className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
             >
               <Icon name="logout" className="size-4" />
@@ -93,7 +94,7 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: React.Re
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white sm:hidden">
+      <nav className="hide-with-keyboard fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[var(--safe-bottom)] sm:hidden">
         <div className="grid" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}>
           {nav.map((item) => (
             <Link

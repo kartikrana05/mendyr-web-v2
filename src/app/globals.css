@@ -25,6 +25,50 @@
 
 :root {
   color-scheme: light;
+
+  /* Phone screen edges — notch / Dynamic Island, home indicator, Android system bars; 0 on
+     desktops. Every fixed or sticky bar pads with these, so content never sits behind them. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
+/* Nothing may push the page sideways. `clip` (unlike `hidden`) doesn't create a scroll
+   container, so sticky headers keep working. */
+html,
+body {
+  overflow-x: clip;
+}
+
+/* ── App build (html.is-app): behave like a native app, not a web page ─────────────── */
+html.is-app,
+html.is-app body {
+  overscroll-behavior: none; /* no rubber-band bounce or pull-to-refresh past the edges */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+html.is-app body {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+/* Taps on controls shouldn't select text or open the long-press callout. */
+html.is-app :is(button, a, nav, label, [role="button"], [role="switch"]) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* iOS zooms the page into any field under 16px; at 16px it stays put. */
+html.is-app :is(input, textarea, select) {
+  font-size: 16px;
+}
+
+/* Bottom bars step aside while the on-screen keyboard is up (class set by NativeBootstrap). */
+html.keyboard-open .hide-with-keyboard {
+  display: none;
 }
 
 body {

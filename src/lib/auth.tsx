@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
+import { setTokens } from "@/lib/session";
 import type { Role, TokenPair, User } from "@/lib/types";
 
 export interface RegisterInput {
@@ -29,6 +30,11 @@ export function homeFor(role: Role): string {
   return role === "professional" ? "/pro" : "/patient";
 }
 
+/** App build: keep the tokens on the phone. The web build's session is already in cookies. */
+function keepSession(tokens: TokenPair): Promise<void> {
+  return setTokens({ access: tokens.access_token, refresh: tokens.refresh_token });
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,12 +55,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: "POST",
       body: { email, password },
     });
+    await keepSession(tokens);
     setUser(tokens.user);
     return tokens.user;
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
     const tokens = await api<TokenPair>("/auth/register", { method: "POST", body: input });
+    await keepSession(tokens);
     setUser(tokens.user);
     return tokens.user;
   }, []);
@@ -63,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api("/auth/logout", { method: "POST" });
     } finally {
+      await setTokens(null);
       setUser(null);
     }
   }, []);

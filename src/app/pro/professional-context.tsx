@@ -31,8 +31,8 @@ function OnboardingShell({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
   const router = useRouter();
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200/70 bg-white">
+    <div className="min-h-dvh">
+      <header className="border-b border-slate-200/70 bg-white pt-[var(--safe-top)]">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4">
           <Logo href="/" />
           <button
@@ -47,7 +47,7 @@ function OnboardingShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-3xl px-4 pt-8 pb-[calc(2rem+var(--safe-bottom))]">{children}</main>
     </div>
   );
 }

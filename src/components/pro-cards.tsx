@@ -24,7 +24,7 @@ export function RequestCard({ request, onGone }: { request: BookingRequest; onGo
     try {
       await api(`/bookings/${request.id}/accept`, { method: "POST" });
       toast.success("Booking accepted — it's in your bookings now.");
-      router.push(`/pro/bookings/${request.id}`);
+      router.push(`/pro/bookings/view?id=${request.id}`);
     } catch (err) {
       toast.error(
         err instanceof ApiError && err.status === 409
@@ -75,7 +75,7 @@ export function RequestCard({ request, onGone }: { request: BookingRequest; onGo
 export function ProBookingRow({ booking }: { booking: ProBooking }) {
   return (
     <Link
-      href={`/pro/bookings/${booking.id}`}
+      href={`/pro/bookings/view?id=${booking.id}`}
       className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition hover:border-brand-300"
     >
       <div className="min-w-0 flex-1">
