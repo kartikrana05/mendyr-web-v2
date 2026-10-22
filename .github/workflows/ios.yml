@@ -1,0 +1,124 @@
+# Builds the iOS app from the same code as the website (see README → Mobile apps).
+#
+#   push to main (and PRs touching iOS files) → compiles for the simulator; no signing needed.
+#   tag v*  /  manual run                     → signed archive uploaded to TestFlight, using
+#                                               Xcode's automatic signing with an App Store
+#                                               Connect API key (no certificates to manage).
+#
+# macOS runners bill at 10x on private repos, hence the narrower pull-request trigger.
+# Repository variable: MENDYR_API_URL (the backend the app talks to).
+name: iOS app
+
+on:
+  pull_request:
+    paths:
+      - "ios/**"
+      - "capacitor.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/ios.yml"
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: "Upload a signed build to TestFlight"
+        type: boolean
+        default: true
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (and ship to TestFlight)
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      API_URL: ${{ vars.MENDYR_API_URL }}
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      UPLOAD: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.testflight) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Resolve the backend URL
+        run: |
+          if [ -z "$API_URL" ]; then
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "API_URL=https://api.example.invalid" >> "$GITHUB_ENV"
+              echo "::notice::MENDYR_API_URL is not set — this PR build is a compile check only."
+            else
+              echo "::error::Set the MENDYR_API_URL repository variable (Settings → Secrets and variables → Actions → Variables) to the backend URL."
+              exit 1
+            fi
+          fi
+
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then name="${GITHUB_REF_NAME#v}"; else name="$(node -p "require('./package.json').version")"; fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "code=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Building Mendyr $name ($GITHUB_RUN_NUMBER)"
+
+      - name: Build the app bundle
+        run: npm run build:app -- --no-sync
+        env:
+          NEXT_PUBLIC_API_URL: ${{ env.API_URL }}
+
+      - run: npx cap sync ios
+
+      - name: Compile for the simulator (no signing)
+        run: >-
+          xcodebuild -quiet -project ios/App/App.xcodeproj -scheme App -configuration Debug
+          -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/derived"
+          CODE_SIGNING_ALLOWED=NO build
+
+      - name: Check TestFlight credentials
+        if: env.UPLOAD == 'true' && env.ASC_KEY_ID == ''
+        run: echo "::warning::Skipping TestFlight — add the APP_STORE_CONNECT_* and APPLE_TEAM_ID secrets (README → Mobile apps)."
+
+      - name: Archive and upload to TestFlight
+        if: env.UPLOAD == 'true' && env.ASC_KEY_ID != ''
+        run: |
+          key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$key"
+          auth=(-allowProvisioningUpdates -authenticationKeyPath "$key"
+                -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+
+          xcodebuild -quiet -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Mendyr.xcarchive" \
+            "${auth[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="${{ steps.version.outputs.name }}" \
+            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.code }}" \
+            archive
+
+          cp ios/ExportOptions.plist "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -replace teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
+          # destination=upload in ExportOptions.plist: export straight to App Store Connect.
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Mendyr.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            "${auth[@]}"
+
+      - name: Remove the API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP"/AuthKey_*.p8
