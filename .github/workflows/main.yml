@@ -1,0 +1,14 @@
+name: My Workflow
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/capacitor-app
+
+jobs:
+  example:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: echo "Workflow is running!"
