@@ -20,9 +20,27 @@ function storageModule() {
   return import("@aparajita/capacitor-secure-storage");
 }
 
+// iOS keeps Keychain items after the app is uninstalled, so a reinstall would wake up signed
+// in with old tokens. WebView storage *is* wiped on uninstall: no marker there = fresh install.
+const INSTALL_MARKER = "mendyr-installed";
+
+function isFreshInstall(): boolean {
+  try {
+    if (localStorage.getItem(INSTALL_MARKER)) return false;
+    localStorage.setItem(INSTALL_MARKER, "1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getTokens(): Promise<Tokens | null> {
   if (!IS_APP) return null;
   if (cached !== undefined) return cached;
+  if (isFreshInstall()) {
+    await setTokens(null);
+    return cached ?? null;
+  }
   try {
     const { SecureStorage } = await storageModule();
     const stored = await SecureStorage.get(KEY);

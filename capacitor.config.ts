@@ -25,14 +25,15 @@ const config: CapacitorConfig = {
     SplashScreen: {
       // Hidden by NativeBootstrap after the first frame, so the app never flashes white.
       launchAutoHide: false,
+      launchFadeOutDuration: 200,
       backgroundColor: "#F7F9FC",
       showSpinner: false,
       androidScaleType: "CENTER_CROP",
     },
     Keyboard: {
-      // iOS: shrink the page above the keyboard so the focused field stays visible.
+      // iOS: shrink the page above the keyboard so the focused field stays visible. (Android
+      // needs nothing here: SystemBars pads the app by the keyboard's height.)
       resize: KeyboardResize.Body,
-      resizeOnFullScreen: true,
     },
   },
 };

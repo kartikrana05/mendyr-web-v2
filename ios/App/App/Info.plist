@@ -26,6 +26,8 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Mendyr uses your location to fill in your address and to match you with care professionals nearby.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Mendyr uses your location to fill in your address and to match you with care professionals nearby.</string>
 	<key>UIApplicationSceneManifest</key>

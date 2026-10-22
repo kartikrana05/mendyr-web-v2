@@ -26,9 +26,17 @@ export function NativeBootstrap() {
       if (!Capacitor.isNativePlatform() || cancelled) return;
       document.documentElement.classList.add("is-native");
 
-      const [{ App }, { SplashScreen }, { Keyboard }] = await Promise.all([
+      // The splash stays up (launchAutoHide: false) until the first frame is painted, so the
+      // app never flashes an empty WebView. Done first, on its own, so nothing below can
+      // leave it stuck — plus a timer in case even this frame never comes.
+      const { SplashScreen } = await import("@capacitor/splash-screen");
+      const hideSplash = () => void SplashScreen.hide().catch(() => {});
+      requestAnimationFrame(hideSplash);
+      const safety = setTimeout(hideSplash, 3000);
+      cleanups.push(() => clearTimeout(safety));
+
+      const [{ App }, { Keyboard }] = await Promise.all([
         import("@capacitor/app"),
-        import("@capacitor/splash-screen"),
         import("@capacitor/keyboard"),
       ]);
       if (cancelled) return;
@@ -36,10 +44,6 @@ export function NativeBootstrap() {
       // Light app background, so the system bars' icons must be dark (also set in
       // capacitor.config.ts; repeated here in case the OS reset it).
       SystemBars.setStyle({ style: SystemBarsStyle.Light }).catch(() => {});
-
-      // The splash stays up (launchAutoHide: false) until the first frame is painted, so the
-      // app never flashes an empty white WebView.
-      requestAnimationFrame(() => SplashScreen.hide({ fadeOutDuration: 200 }).catch(() => {}));
 
       const back = await App.addListener("backButton", ({ canGoBack }) => {
         if (ROOT_PATHS.has(window.location.pathname.replace(/\/$/, "") || "/") || !canGoBack) {

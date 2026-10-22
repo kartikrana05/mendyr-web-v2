@@ -14,10 +14,17 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Shown in the bands Capacitor pads around the WebView on older WebViews, and
+             behind the keyboard: the app's own background, not the theme default. -->
+        <item name="android:windowBackground">@color/mendyr_background</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- Android 12+ launch splash: the app icon on the app background. -->
+        <item name="windowSplashScreenBackground">@color/mendyr_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
