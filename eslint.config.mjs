@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Native projects: `cap sync` copies the built web bundle into them.
+    "android/**",
+    "ios/**",
   ]),
 ]);
 

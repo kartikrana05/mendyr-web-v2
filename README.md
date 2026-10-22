@@ -48,12 +48,12 @@ collected after the visit for now — nothing is charged online.
 | `/login`, `/register/*` | everyone | Email + password auth | `POST /auth/login`, `POST /auth/register` |
 | `/patient` | patient | Upcoming visits, quick booking | `GET /bookings`, `GET /addresses` |
 | `/patient/book` | patient | Booking flow | `POST /bookings/quote`, `GET /professionals/nearby`, `POST /addresses`, `POST /bookings` |
-| `/patient/bookings[/id]` | patient | Track, cancel, rate | `GET /bookings/{id}`, `POST /bookings/{id}/cancel`, `POST /reviews` |
+| `/patient/bookings`, `/patient/bookings/view?id=` | patient | Track, cancel, rate | `GET /bookings/{id}`, `POST /bookings/{id}/cancel`, `POST /reviews` |
 | `/patient/account` | patient | Profile, saved addresses | `PATCH /users/me`, `/addresses` CRUD |
 | `/pro/onboarding` | professional | First-time profile setup | `POST /professionals/onboard`, `PUT /professionals/me/availability/slots` |
 | `/pro` | professional | Dashboard, accepting switch, earnings | `GET /professionals/me`, `PATCH /professionals/me`, `GET /bookings/professional/*` |
 | `/pro/requests` | professional | Open requests near them | `GET /bookings/professional/requests`, `POST /bookings/{id}/accept` |
-| `/pro/bookings[/id]` | professional | Their visits; start, complete, hand back | `GET /bookings/professional/{id}`, `POST /bookings/{id}/check-in`, `…/check-out`, `…/release` |
+| `/pro/bookings`, `/pro/bookings/view?id=` | professional | Their visits; start, complete, hand back | `GET /bookings/professional/{id}`, `POST /bookings/{id}/check-in`, `…/check-out`, `…/release` |
 | `/pro/schedule` | professional | Weekly timings | `GET`/`PUT /professionals/me/availability/slots` |
 | `/pro/profile` | professional | Details, service area, services | `PATCH /professionals/me`, `/professionals/me/services` |
 
@@ -83,7 +83,9 @@ src/
                           sends anyone without a profile to /pro/onboarding
   components/             UI kit (ui.tsx), app shell, forms, cards
   lib/
-    api.ts                fetch wrapper: envelope, errors, silent refresh
+    api.ts                fetch wrapper: envelope, errors, silent refresh (cookies on the web, Bearer in the app)
+    platform.ts           which build this is (web or app) and the API origin
+    session.ts            the app build's tokens, in the iOS Keychain / Android Keystore
     auth.tsx              signed-in user context
     hooks.ts              useApi (fetch + polling), useNow
     types.ts              API response types — mirror the backend's app/schemas
@@ -131,3 +133,96 @@ Checks: `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 On the backend, set `ENVIRONMENT=production` (secure cookies). Because requests reach it through
 this site's proxy, the default `SESSION_COOKIE_SAMESITE=lax` is correct and no CORS origin
 needs adding.
+
+## Mobile apps (Android & iOS)
+
+The same code ships as native apps through [Capacitor 8](https://capacitorjs.com). There is
+one app, **Mendyr** (`com.mendyr.patient`, the original app's id); patients and professionals
+both use it, and it routes them by role exactly like the website.
+
+### How the app build differs
+
+`npm run build:app` builds this repo with `NEXT_PUBLIC_BUILD_TARGET=app`
+(`src/lib/platform.ts`), a static export into `out/`, then `cap sync` copies it into
+`android/` and `ios/`. In that build:
+
+- **API**: calls the backend directly at `NEXT_PUBLIC_API_URL` (there's no `/api` proxy
+  inside a phone). The backend must list the app's origins in `CORS_ORIGINS`:
+  `capacitor://localhost` (iOS) and `https://localhost` (Android).
+- **Session**: Bearer tokens kept in the iOS Keychain / Android Keystore
+  (`src/lib/session.ts`) instead of cookies; refreshed silently, cleared on logout.
+- **Start screen**: `/` is a native-style welcome screen; signed-in users skip to their area.
+- **Booking pages** use `?id=` (`/patient/bookings/view?id=…`) because a static export can't
+  pre-render every booking id. The website uses the same URLs.
+
+### Fitting the phone screen
+
+- The WebView runs edge to edge (`viewport-fit=cover`, Android `EdgeToEdge`, Capacitor's
+  `SystemBars` `insetsHandling: "native"`). Every bar pads itself with the `--safe-top` /
+  `--safe-bottom` CSS variables (`env(safe-area-inset-*)`) — nothing sits under the notch,
+  status bar, home indicator or Android navigation bar.
+- Nothing can scroll sideways (`overflow-x: clip`); heights use `dvh`; inputs are 16px so iOS
+  doesn't zoom; pinch-zoom and rubber-band overscroll are off in the app (not on the website).
+- Portrait only; the splash stays up until the first frame is painted; the Android back button
+  goes back (or leaves the app from a home screen); the bottom tab bar hides while the keyboard
+  is open; "Use my current location" uses the native permission prompt.
+- `src/components/native-bootstrap.tsx` wires the native pieces; `capacitor.config.ts` holds
+  the plugin settings.
+
+### Run on a phone or simulator
+
+Needs Android Studio (JDK 21, Android SDK 36) and/or Xcode 16+.
+
+```bash
+NEXT_PUBLIC_API_URL=https://<backend>.fastapicloud.dev npm run build:app
+npm run cap:android   # opens Android Studio — press Run
+npm run cap:ios       # opens Xcode — pick a simulator or device, press Run
+```
+
+Use an `https` backend: the app's WebView is a secure origin, so a plain-`http` local backend
+is blocked as mixed content. After changing web code, re-run `npm run build:app`.
+
+Icons and splash screens come from `public/mendyr.png`; regenerate them with
+`npm run app:assets` (store icons are kept fully opaque, as Apple requires).
+
+### CI/CD (GitHub Actions)
+
+| Workflow | Runs on | Produces |
+|---|---|---|
+| `ci.yml` | every PR, pushes to `main` | lint, typecheck, website build, app bundle build |
+| `android.yml` | PRs, pushes to `main`, tags `v*`, manual | debug APK (run artifact); on `main` also the **android-latest** pre-release (a fixed download link for testers); on tags/manual a signed APK + AAB, a GitHub Release, and optionally Google Play |
+| `ios.yml` | pushes to `main`, tags `v*`, manual, PRs touching iOS files | simulator compile check; on tags/manual a signed build uploaded to **TestFlight** |
+
+Ship a release: `git tag v0.2.0 && git push origin v0.2.0`. Build numbers come from the
+workflow run number (always increasing); the version name from the tag (numbers only, e.g.
+`v1.2.3`) or `package.json`.
+
+**Repository settings** (Settings → Secrets and variables → Actions):
+
+| Name | Kind | Needed for |
+|---|---|---|
+| `MENDYR_API_URL` | variable | every installable build — the backend URL |
+| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | signed Android releases |
+| `PLAY_SERVICE_ACCOUNT_JSON` | secret | Google Play uploads |
+| `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_P8`, `APPLE_TEAM_ID` | secrets | TestFlight uploads |
+
+Without the secrets, the matching steps are skipped and everything else still runs.
+
+**Android release signing** — create the upload key once and keep it safe (losing it means
+you can't update the app):
+
+```bash
+keytool -genkeypair -v -keystore mendyr-upload.keystore -alias mendyr \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -i mendyr-upload.keystore | pbcopy   # paste as ANDROID_KEYSTORE_BASE64
+```
+
+**Google Play** — create the app in Play Console (package `com.mendyr.patient`), upload the
+first AAB by hand (Google requires it), then add a service account with release permissions
+and store its JSON key as `PLAY_SERVICE_ACCOUNT_JSON`. Tagged builds then go to internal
+testing; manual runs can pick another track.
+
+**App Store / TestFlight** — in App Store Connect create the app with bundle id
+`com.mendyr.patient`, then create an API key (Users and Access → Integrations, role *Admin*
+so Xcode can manage signing for you) and store its id, issuer id and the contents of the
+`.p8` file. `APPLE_TEAM_ID` is on developer.apple.com → Membership.
