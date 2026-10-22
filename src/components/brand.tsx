@@ -8,7 +8,7 @@ import type { ProfessionalType } from "@/lib/types";
 export function Logo({ href = "/", className }: { href?: string; className?: string }) {
   return (
     <Link href={href} className={cn("inline-flex items-center gap-2", className)} aria-label="Mendyr home">
-      <Image src="/mendyr.png" alt="" width={36} height={36} priority className="size-9" />
+      <Image src="/mendyr.png" alt="" width={36} height={36} preload className="size-9" />
       <span className="font-display text-xl font-bold tracking-tight text-slate-900">Mendyr</span>
     </Link>
   );

@@ -23,8 +23,9 @@ export const viewport: Viewport = {
   // Lay out edge to edge and pad with env(safe-area-inset-*) ourselves (see globals.css),
   // so nothing hides behind a notch, status bar or home indicator.
   viewportFit: "cover",
-  // The app is a fixed-scale native UI; the website stays zoomable for accessibility.
-  ...(IS_APP ? { maximumScale: 1, userScalable: false } : {}),
+  // The app is a fixed-scale native UI whose content shrinks above the on-screen keyboard;
+  // the website keeps browser defaults (zoomable, for accessibility).
+  ...(IS_APP ? { maximumScale: 1, userScalable: false, interactiveWidget: "resizes-content" } : {}),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

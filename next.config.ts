@@ -43,11 +43,12 @@ function webConfig(): NextConfig {
 
 function appConfig(): NextConfig {
   // Static files only: no Next server inside the app, so no rewrites, no image optimizer and
-  // no Cache Components (the pages already fetch everything client-side). Each route exports
-  // as <route>/index.html, which the native WebView's local file server resolves directly.
+  // no Cache Components (export mode rejects PPR; the pages fetch everything client-side
+  // anyway). trailingSlash stays off: Capacitor serves the root index.html for every
+  // extensionless path regardless, and trailing slashes would change usePathname() values
+  // the shared code compares exactly. Client navigation reads each route's .txt payload.
   return {
     output: "export",
-    trailingSlash: true,
     images: { unoptimized: true },
     // With output: "export" this is where the finished site lands — Capacitor's webDir. It
     // also keeps the app build from clobbering the web build's .next/.
