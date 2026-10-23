@@ -1,8 +1,10 @@
 # Builds the Android app from the same code as the website (see README → Mobile apps).
 #
-#   pull request / push to main → debug APK, downloadable from the run's artifacts. Pushes to
+#   push to any branch          → debug APK, downloadable from the run's artifacts. Pushes to
 #                                 main also refresh the "android-latest" pre-release, a stable
 #                                 download link for testers.
+#   pull request from a fork    → the same build, as a compile check (branches of this repo are
+#                                 already built by their push).
 #   tag v*  /  manual run       → signed release APK + AAB (needs the ANDROID_* secrets); tags
 #                                 get a GitHub Release, and with PLAY_SERVICE_ACCOUNT_JSON the
 #                                 AAB goes to Google Play (internal testing by default).
@@ -12,10 +14,10 @@
 name: Android app
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches: ["**"]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
     inputs:
       play_track:
@@ -34,6 +36,8 @@ permissions:
 jobs:
   build:
     name: Build APK / AAB
+    # A pull request from a branch of this repo was already built by its push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -65,13 +69,16 @@ jobs:
       - name: Resolve the backend URL
         run: |
           if [ -z "$API_URL" ]; then
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
               echo "API_URL=https://api.example.invalid" >> "$GITHUB_ENV"
               echo "::notice::MENDYR_API_URL is not set — this PR build is a compile check only."
             else
-              echo "::error::Set the MENDYR_API_URL repository variable (Settings → Secrets and variables → Actions → Variables) to the backend URL."
+              echo "::error::Set the MENDYR_API_URL repository variable (Settings → Secrets and variables → Actions → Variables) to the backend URL, e.g. https://<app>.fastapicloud.dev"
               exit 1
             fi
+          elif [[ "$API_URL" != https://* ]]; then
+            echo "::error::MENDYR_API_URL must be an https:// address (the app can't call plain http), got: $API_URL"
+            exit 1
           fi
 
       - name: Version

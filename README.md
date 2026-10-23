@@ -189,9 +189,13 @@ Icons and splash screens come from `public/mendyr.png`; regenerate them with
 
 | Workflow | Runs on | Produces |
 |---|---|---|
-| `ci.yml` | every PR, pushes to `main` | lint, typecheck, website build, app bundle build |
-| `android.yml` | PRs, pushes to `main`, tags `v*`, manual | debug APK (run artifact); on `main` also the **android-latest** pre-release (a fixed download link for testers); on tags/manual a signed APK + AAB, a GitHub Release, and optionally Google Play |
+| `ci.yml` | every push (any branch), PRs from forks | lint, typecheck, website build, app bundle build |
+| `android.yml` | every push (any branch), PRs from forks, tags `v*`, manual | debug APK (run artifact); on `main` also the **android-latest** pre-release (a fixed download link for testers); on tags/manual a signed APK + AAB, a GitHub Release, and optionally Google Play |
 | `ios.yml` | pushes to `main`, tags `v*`, manual, PRs touching iOS files | simulator compile check; on tags/manual a signed build uploaded to **TestFlight** |
+
+**Test APK for a branch**: push it, open its *Android app* run in the Actions tab, and download
+`mendyr-android-debug` under *Artifacts* (a zip with the APK inside). GitHub lists a workflow,
+and shows its *Run workflow* button, only once the workflow file is on `main`.
 
 Ship a release: `git tag v0.2.0 && git push origin v0.2.0`. Build numbers come from the
 workflow run number (always increasing); the version name from the tag (numbers only, e.g.

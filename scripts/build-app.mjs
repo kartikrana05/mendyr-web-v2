@@ -18,6 +18,16 @@ if (!env.NEXT_PUBLIC_API_URL) {
   );
   process.exit(1);
 }
+// The app appends /api/v1 itself, so this must be the bare address (a common slip is pasting
+// the /api/v1 or /docs URL).
+const apiUrl = URL.canParse(env.NEXT_PUBLIC_API_URL) ? new URL(env.NEXT_PUBLIC_API_URL) : null;
+if (!apiUrl || apiUrl.pathname !== "/" || apiUrl.search || apiUrl.hash) {
+  console.error(
+    "NEXT_PUBLIC_API_URL must be the backend's bare address, e.g. https://<backend>.fastapicloud.dev\n" +
+      `(the app adds /api/v1 itself) — got "${env.NEXT_PUBLIC_API_URL}".`,
+  );
+  process.exit(1);
+}
 
 function run(command, args) {
   const result = spawnSync(command, args, { stdio: "inherit", env, shell: process.platform === "win32" });

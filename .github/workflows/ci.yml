@@ -1,11 +1,12 @@
-# Every pull request and every push to main: the code must lint, typecheck, and build as both
-# the website (Vercel deploys it) and the app bundle (the Android/iOS workflows ship it).
+# Every push (any branch) and pull requests from forks: the code must lint, typecheck, and
+# build as both the website (Vercel deploys it) and the app bundle (the Android/iOS workflows
+# ship it).
 name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches: ["**"]
+  pull_request:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -17,6 +18,8 @@ permissions:
 jobs:
   checks:
     name: Lint, typecheck, build (web + app)
+    # A pull request from a branch of this repo was already checked by its push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
