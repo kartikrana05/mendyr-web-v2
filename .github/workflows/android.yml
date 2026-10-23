@@ -49,14 +49,14 @@ jobs:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
       RELEASE_BUILD: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
@@ -103,22 +103,29 @@ jobs:
       - name: Name the debug APK
         run: mv android/app/build/outputs/apk/debug/app-debug.apk "Mendyr-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}-debug.apk"
 
-      - uses: actions/upload-artifact@v4
+      # Uploaded as the .apk itself, not zipped: download it from the run page and install it.
+      - uses: actions/upload-artifact@v7
         with:
-          name: mendyr-android-debug
           path: Mendyr-*-debug.apk
+          archive: false
           retention-days: 14
+
+      # One fixed asset name (replaced on every build), so this link never changes:
+      # https://github.com/<owner>/<repo>/releases/download/android-latest/Mendyr-latest.apk
+      - name: Name the testers' copy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: cp Mendyr-*-debug.apk Mendyr-latest.apk
 
       - name: Refresh the testers' download link
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: android-latest
           name: Android — latest main build
           body: Debug build of the newest commit on main, for testing. Install on Android after allowing installs from this source.
           prerelease: true
           make_latest: false
-          files: Mendyr-*-debug.apk
+          files: Mendyr-latest.apk
 
       - name: Set up release signing
         if: env.RELEASE_BUILD == 'true' && env.ANDROID_KEYSTORE_BASE64 != ''
@@ -136,7 +143,7 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk "release/Mendyr-${{ steps.version.outputs.name }}.apk"
           cp android/app/build/outputs/bundle/release/app-release.aab "release/Mendyr-${{ steps.version.outputs.name }}.aab"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.RELEASE_BUILD == 'true' && env.ANDROID_KEYSTORE_BASE64 != ''
         with:
           name: mendyr-android-release
@@ -145,7 +152,7 @@ jobs:
 
       - name: Publish the GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') && env.ANDROID_KEYSTORE_BASE64 != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: release/*
           fail_on_unmatched_files: true

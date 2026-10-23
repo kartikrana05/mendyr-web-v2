@@ -191,11 +191,14 @@ Icons and splash screens come from `public/mendyr.png`; regenerate them with
 |---|---|---|
 | `ci.yml` | every push (any branch), PRs from forks | lint, typecheck, website build, app bundle build |
 | `android.yml` | every push (any branch), PRs from forks, tags `v*`, manual | debug APK (run artifact); on `main` also the **android-latest** pre-release (a fixed download link for testers); on tags/manual a signed APK + AAB, a GitHub Release, and optionally Google Play |
-| `ios.yml` | pushes to `main`, tags `v*`, manual, PRs touching iOS files | simulator compile check; on tags/manual a signed build uploaded to **TestFlight** |
+| `ios.yml` | manual only, for now (Android ships first) | simulator compile check; optionally a signed build uploaded to **TestFlight** |
 
 **Test APK for a branch**: push it, open its *Android app* run in the Actions tab, and download
-`mendyr-android-debug` under *Artifacts* (a zip with the APK inside). GitHub lists a workflow,
-and shows its *Run workflow* button, only once the workflow file is on `main`.
+`Mendyr-<version>-<run>-debug.apk` under *Artifacts* — the APK itself, ready to install. Builds
+of `main` are also at a link that never changes:
+`https://github.com/<owner>/<repo>/releases/download/android-latest/Mendyr-latest.apk`.
+GitHub lists a workflow, and shows its *Run workflow* button, only once the workflow file is
+on `main`.
 
 Ship a release: `git tag v0.2.0 && git push origin v0.2.0`. Build numbers come from the
 workflow run number (always increasing); the version name from the tag (numbers only, e.g.
@@ -211,6 +214,10 @@ workflow run number (always increasing); the version name from the tag (numbers 
 | `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_P8`, `APPLE_TEAM_ID` | secrets | TestFlight uploads |
 
 Without the secrets, the matching steps are skipped and everything else still runs.
+
+**Debug APKs** are signed with the committed `android/app/debug.keystore` (the standard Android
+debug credentials), so a newer debug APK — from CI or anyone's laptop — installs over the
+previous one. It is not a release key; never use it for the stores.
 
 **Android release signing** — create the upload key once and keep it safe (losing it means
 you can't update the app):

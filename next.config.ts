@@ -47,12 +47,11 @@ function appConfig(): NextConfig {
   // anyway). trailingSlash stays off: Capacitor serves the root index.html for every
   // extensionless path regardless, and trailing slashes would change usePathname() values
   // the shared code compares exactly. Client navigation reads each route's .txt payload.
+  // The finished site lands in out/ (Capacitor's webDir). The build itself still runs in
+  // .next/, replacing a local production web build there (next dev's .next/dev is kept).
   return {
     output: "export",
     images: { unoptimized: true },
-    // With output: "export" this is where the finished site lands — Capacitor's webDir. It
-    // also keeps the app build from clobbering the web build's .next/.
-    distDir: "out",
     turbopack,
   };
 }
