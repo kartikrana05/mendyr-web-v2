@@ -16,6 +16,22 @@ export interface NavItem {
   icon: IconName;
   /** Match only this exact path (for section roots like /patient). */
   exact?: boolean;
+  /** A count to flag on the tab (e.g. open requests); hidden when 0. */
+  badge?: number;
+}
+
+function NavBadge({ count, className }: { count?: number; className?: string }) {
+  if (!count) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white",
+        className,
+      )}
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  );
 }
 
 /**
@@ -74,6 +90,7 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: React.Re
               >
                 <Icon name={item.icon} className="size-4" />
                 {item.label}
+                <NavBadge count={item.badge} />
               </Link>
             ))}
           </nav>
@@ -100,12 +117,13 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: React.Re
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
+                "relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
                 isActive(item) ? "text-brand-700" : "text-slate-500",
               )}
             >
               <Icon name={item.icon} className="size-5" />
               {item.label}
+              <NavBadge count={item.badge} className="absolute left-1/2 top-1 ml-1.5" />
             </Link>
           ))}
         </div>

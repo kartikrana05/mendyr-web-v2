@@ -9,20 +9,27 @@ import { Icon } from "@/components/icons";
 import { Alert, PageSpinner } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { useApi } from "@/lib/hooks";
-import type { ProfessionalProfile } from "@/lib/types";
+import type { BookingRequest, ProfessionalProfile } from "@/lib/types";
 
-const NAV: NavItem[] = [
-  { href: "/pro", label: "Dashboard", icon: "home", exact: true },
-  { href: "/pro/requests", label: "Requests", icon: "bell" },
-  { href: "/pro/bookings", label: "Bookings", icon: "calendar" },
-  { href: "/pro/schedule", label: "Timings", icon: "clock" },
-  { href: "/pro/profile", label: "Profile", icon: "user" },
-];
+import { NewRequestAlert } from "./new-request-alert";
+
+function navFor(openRequests: number): NavItem[] {
+  return [
+    { href: "/pro", label: "Dashboard", icon: "home", exact: true },
+    { href: "/pro/requests", label: "Requests", icon: "bell", badge: openRequests },
+    { href: "/pro/bookings", label: "Bookings", icon: "calendar" },
+    { href: "/pro/schedule", label: "Timings", icon: "clock" },
+    { href: "/pro/profile", label: "Profile", icon: "user" },
+  ];
+}
+
+type OpenRequests = ReturnType<typeof useApi<BookingRequest[]>>;
 
 interface ProfessionalContextValue {
   profile: ProfessionalProfile | null;
   setProfile: (profile: ProfessionalProfile) => void;
   reload: () => Promise<void>;
+  requests: OpenRequests;
 }
 
 const ProfessionalContext = createContext<ProfessionalContextValue | null>(null);
@@ -55,7 +62,9 @@ function OnboardingShell({ children }: { children: React.ReactNode }) {
 /**
  * Loads the professional's profile once for every /pro page. No profile yet means they
  * signed up but haven't finished onboarding, so they're sent there (and away from it once
- * done). Sits inside the layout's Suspense boundary: it reads the pathname.
+ * done). Once onboarded, also polls open requests for every page — feeding the Requests
+ * badge and the new-request pop-up, and shared with the pages that list them. Sits inside
+ * the layout's Suspense boundary: it reads the pathname.
  */
 export function ProfessionalProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -63,13 +72,16 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
   const onOnboarding = pathname === "/pro/onboarding";
   const { data: profile, error, reload, mutate } = useApi<ProfessionalProfile>("/professionals/me");
   const needsOnboarding = error?.status === 404;
+  const requests = useApi<BookingRequest[]>(profile ? "/bookings/professional/requests" : null, {
+    pollMs: 15_000,
+  });
 
   useEffect(() => {
     if (needsOnboarding && !onOnboarding) router.replace("/pro/onboarding");
     if (profile && onOnboarding) router.replace("/pro");
   }, [needsOnboarding, onOnboarding, profile, router]);
 
-  const value: ProfessionalContextValue = { profile: profile ?? null, setProfile: mutate, reload };
+  const value: ProfessionalContextValue = { profile: profile ?? null, setProfile: mutate, reload, requests };
 
   if (onOnboarding) {
     if (!needsOnboarding) return <PageSpinner />; // loading, or onboarded and redirecting
@@ -93,7 +105,10 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
   }
   return (
     <ProfessionalContext.Provider value={value}>
-      <AppShell nav={NAV}>{children}</AppShell>
+      <AppShell nav={navFor(requests.data?.length ?? 0)}>
+        {children}
+        <NewRequestAlert requests={requests.data} quiet={pathname === "/pro/requests"} />
+      </AppShell>
     </ProfessionalContext.Provider>
   );
 }
@@ -114,4 +129,9 @@ export function useProfessional() {
   const { profile, setProfile, reload } = useProfessionalContext();
   if (!profile) throw new Error("useProfessional() used before the profile loaded");
   return { profile, setProfile, reload };
+}
+
+/** Open requests near the professional, polled by the provider for every /pro page. */
+export function useOpenRequests(): OpenRequests {
+  return useProfessionalContext().requests;
 }

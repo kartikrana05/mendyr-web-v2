@@ -12,9 +12,9 @@ import { useAuth } from "@/lib/auth";
 import { ACTIVE_STATUSES, PROFESSION_LABEL } from "@/lib/constants";
 import { formatINR, istDateKey } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
-import type { AvailabilitySlot, BookingRequest, ProBooking, ProfessionalProfile } from "@/lib/types";
+import type { AvailabilitySlot, ProBooking, ProfessionalProfile } from "@/lib/types";
 
-import { useProfessional } from "./professional-context";
+import { useOpenRequests, useProfessional } from "./professional-context";
 
 function Stat({ icon, label, value, tone }: { icon: IconName; label: string; value: string; tone: string }) {
   return (
@@ -32,7 +32,7 @@ export default function ProDashboardPage() {
   const { user } = useAuth();
   const { profile, setProfile } = useProfessional();
   const toast = useToast();
-  const requests = useApi<BookingRequest[]>("/bookings/professional/requests", { pollMs: 20_000 });
+  const requests = useOpenRequests();
   const bookings = useApi<ProBooking[]>("/bookings/professional/mine?page_size=100", { pollMs: 60_000 });
   const slots = useApi<AvailabilitySlot[]>("/professionals/me/availability/slots");
   const [toggling, setToggling] = useState(false);

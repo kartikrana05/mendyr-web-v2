@@ -6,9 +6,9 @@ import { Icon } from "@/components/icons";
 import { RequestCard } from "@/components/pro-cards";
 import { Alert, Card, PageHeader, PageSpinner } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
-import type { AvailabilitySlot, BookingRequest } from "@/lib/types";
+import type { AvailabilitySlot } from "@/lib/types";
 
-import { useProfessional } from "../professional-context";
+import { useOpenRequests, useProfessional } from "../professional-context";
 
 function Check({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
@@ -21,7 +21,7 @@ function Check({ ok, children }: { ok: boolean; children: React.ReactNode }) {
 
 export default function ProRequestsPage() {
   const { profile } = useProfessional();
-  const requests = useApi<BookingRequest[]>("/bookings/professional/requests", { pollMs: 15_000 });
+  const requests = useOpenRequests();
   const slots = useApi<AvailabilitySlot[]>("/professionals/me/availability/slots");
 
   return (
