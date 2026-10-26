@@ -5,11 +5,11 @@ import { useState } from "react";
 import { PatientBookingRow } from "@/components/booking-cards";
 import { Alert, ButtonLink, Chip, EmptyState, PageHeader, PageSpinner } from "@/components/ui";
 import { ACTIVE_STATUSES } from "@/lib/constants";
-import { useApi } from "@/lib/hooks";
-import type { BookingListItem } from "@/lib/types";
+
+import { usePatientBookings } from "../patient-context";
 
 export default function PatientBookingsPage() {
-  const { data, error, loading } = useApi<BookingListItem[]>("/bookings?page_size=100");
+  const { data, error, loading } = usePatientBookings();
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
 
   const upcoming = (data ?? [])

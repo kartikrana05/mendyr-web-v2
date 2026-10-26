@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { api } from "@/lib/api";
+import { api, SESSION_ENDED } from "@/lib/api";
 import type { Role, TokenPair, User } from "@/lib/types";
 
 export interface RegisterInput {
@@ -42,6 +42,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
+  }, []);
+
+  // A dead session signs the user out; `RoleGate` then sends them to log in and back here.
+  useEffect(() => {
+    const signOut = () => setUser(null);
+    window.addEventListener(SESSION_ENDED, signOut);
+    return () => window.removeEventListener(SESSION_ENDED, signOut);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

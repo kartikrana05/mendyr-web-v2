@@ -11,11 +11,13 @@ import { useAuth } from "@/lib/auth";
 import { ACTIVE_STATUSES } from "@/lib/constants";
 import { formatINR } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
-import type { Address, BookingListItem } from "@/lib/types";
+import type { Address } from "@/lib/types";
+
+import { usePatientBookings } from "./patient-context";
 
 export default function PatientHomePage() {
   const { user } = useAuth();
-  const bookings = useApi<BookingListItem[]>("/bookings?page_size=50");
+  const bookings = usePatientBookings();
   const addresses = useApi<Address[]>("/addresses");
   const { groups } = useCatalog();
 

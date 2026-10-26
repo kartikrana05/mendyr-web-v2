@@ -23,6 +23,9 @@ interface Envelope<T> {
 // starts or ends, or the refresh itself).
 const NO_REFRESH = ["/auth/login", "/auth/register", "/auth/token/refresh", "/auth/logout"];
 
+/** Fired on `window` when a request is rejected and the session can't be refreshed. */
+export const SESSION_ENDED = "mendyr:session-ended";
+
 let refreshInFlight: Promise<boolean> | null = null;
 
 /** Swap the refresh cookie for a new access cookie. Concurrent 401s share one attempt. */
@@ -61,6 +64,11 @@ export async function api<T>(
 
   if (response.status === 401 && !retried && !NO_REFRESH.some((p) => path.startsWith(p))) {
     if (await refreshSession()) return api<T>(path, { method, body }, true);
+    // The refresh token is gone too (logged out on another device, expired, revoked), so
+    // the session is over — `AuthProvider` signs the user out instead of every page showing
+    // the raw 401.
+    window.dispatchEvent(new Event(SESSION_ENDED));
+    throw new ApiError("Your session has ended. Please log in again.", 401, "session_ended");
   }
 
   let payload: Envelope<T> | null = null;
