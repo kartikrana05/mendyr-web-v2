@@ -9,9 +9,9 @@ import { Icon } from "@/components/icons";
 import { Alert, PageSpinner } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { useApi } from "@/lib/hooks";
-import type { BookingRequest, ProfessionalProfile } from "@/lib/types";
+import type { BookingRequest, ProBooking, ProfessionalProfile } from "@/lib/types";
 
-import { NewRequestAlert } from "./new-request-alert";
+import { ProAlerts } from "./pro-alerts";
 
 function navFor(openRequests: number): NavItem[] {
   return [
@@ -24,12 +24,14 @@ function navFor(openRequests: number): NavItem[] {
 }
 
 type OpenRequests = ReturnType<typeof useApi<BookingRequest[]>>;
+type MyBookings = ReturnType<typeof useApi<ProBooking[]>>;
 
 interface ProfessionalContextValue {
   profile: ProfessionalProfile | null;
   setProfile: (profile: ProfessionalProfile) => void;
   reload: () => Promise<void>;
   requests: OpenRequests;
+  bookings: MyBookings;
 }
 
 const ProfessionalContext = createContext<ProfessionalContextValue | null>(null);
@@ -62,9 +64,10 @@ function OnboardingShell({ children }: { children: React.ReactNode }) {
 /**
  * Loads the professional's profile once for every /pro page. No profile yet means they
  * signed up but haven't finished onboarding, so they're sent there (and away from it once
- * done). Once onboarded, also polls open requests for every page — feeding the Requests
- * badge and the new-request pop-up, and shared with the pages that list them. Sits inside
- * the layout's Suspense boundary: it reads the pathname.
+ * done). Once onboarded, also polls open requests and the professional's bookings for
+ * every page — feeding the Requests badge and the new-request / cancelled-booking pop-ups,
+ * and shared with the pages that list them. Sits inside the layout's Suspense boundary: it
+ * reads the pathname.
  */
 export function ProfessionalProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -75,13 +78,25 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
   const requests = useApi<BookingRequest[]>(profile ? "/bookings/professional/requests" : null, {
     pollMs: 15_000,
   });
+  const bookings = useApi<ProBooking[]>(profile ? "/bookings/professional/mine?page_size=100" : null, {
+    pollMs: 30_000,
+  });
+  const { reload: reloadRequests } = requests;
+  const { reload: reloadBookings } = bookings;
+
+  // Pages used to fetch these on mount; refreshing on navigation keeps them as fresh, e.g.
+  // the bookings list right after accepting or releasing one.
+  useEffect(() => {
+    void reloadRequests();
+    void reloadBookings();
+  }, [pathname, reloadRequests, reloadBookings]);
 
   useEffect(() => {
     if (needsOnboarding && !onOnboarding) router.replace("/pro/onboarding");
     if (profile && onOnboarding) router.replace("/pro");
   }, [needsOnboarding, onOnboarding, profile, router]);
 
-  const value: ProfessionalContextValue = { profile: profile ?? null, setProfile: mutate, reload, requests };
+  const value: ProfessionalContextValue = { profile: profile ?? null, setProfile: mutate, reload, requests, bookings };
 
   if (onOnboarding) {
     if (!needsOnboarding) return <PageSpinner />; // loading, or onboarded and redirecting
@@ -107,7 +122,7 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
     <ProfessionalContext.Provider value={value}>
       <AppShell nav={navFor(requests.data?.length ?? 0)}>
         {children}
-        <NewRequestAlert requests={requests.data} quiet={pathname === "/pro/requests"} />
+        <ProAlerts requests={requests.data} bookings={bookings.data} />
       </AppShell>
     </ProfessionalContext.Provider>
   );
@@ -134,4 +149,9 @@ export function useProfessional() {
 /** Open requests near the professional, polled by the provider for every /pro page. */
 export function useOpenRequests(): OpenRequests {
   return useProfessionalContext().requests;
+}
+
+/** The professional's own bookings, polled by the provider for every /pro page. */
+export function useMyBookings(): MyBookings {
+  return useProfessionalContext().bookings;
 }

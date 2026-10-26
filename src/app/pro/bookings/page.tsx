@@ -5,13 +5,14 @@ import { useState } from "react";
 import { ProBookingRow } from "@/components/pro-cards";
 import { Alert, ButtonLink, Chip, EmptyState, PageHeader, PageSpinner } from "@/components/ui";
 import { ACTIVE_STATUSES } from "@/lib/constants";
-import { useApi } from "@/lib/hooks";
 import type { ProBooking } from "@/lib/types";
+
+import { useMyBookings } from "../professional-context";
 
 type Tab = "upcoming" | "completed" | "cancelled";
 
 export default function ProBookingsPage() {
-  const { data, error, loading } = useApi<ProBooking[]>("/bookings/professional/mine?page_size=100");
+  const { data, error, loading } = useMyBookings();
   const [tab, setTab] = useState<Tab>("upcoming");
 
   const all = data ?? [];

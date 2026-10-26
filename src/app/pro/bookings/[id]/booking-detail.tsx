@@ -73,7 +73,7 @@ export function ProBookingDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { data: booking, error, mutate } = useApi<ProBooking>(`/bookings/professional/${id}`);
+  const { data: booking, error, mutate } = useApi<ProBooking>(`/bookings/professional/${id}`, { pollMs: 30_000 });
   const [busy, setBusy] = useState<"start" | "release" | null>(null);
   const now = useNow();
 
