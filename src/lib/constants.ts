@@ -1,9 +1,5 @@
 import type { BookingStatus, ProfessionalType } from "@/lib/types";
 
-/** Share of the visit price a professional keeps. Mirrors the backend's
- * PLATFORM_COMMISSION_PCT (20) — used only in marketing copy; real earnings come from the API. */
-export const PROFESSIONAL_SHARE_PCT = 80;
-
 export const PROFESSIONS: { type: ProfessionalType; label: string; blurb: string }[] = [
   { type: "nurse", label: "Nurse", blurb: "GNM / ANM / B.Sc nursing" },
   { type: "physiotherapist", label: "Physiotherapist", blurb: "BPT / MPT" },

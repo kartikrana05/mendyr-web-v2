@@ -176,3 +176,52 @@ export function ServiceCatalog() {
     </div>
   );
 }
+
+/** Hero panel on the landing page: the most-booked services, live from the catalogue. */
+export function PopularServices() {
+  const { groups, error } = useCatalog();
+  if (error) return null;
+  const popular = (groups ?? [])
+    .flatMap((g) => g.services)
+    .sort((a, b) => (b.bookings_count ?? 0) - (a.bookings_count ?? 0))
+    .slice(0, 4);
+  return (
+    <div className="rounded-(--radius-card) border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/60">
+      <p className="text-sm font-semibold text-slate-900">Popular at home</p>
+      <div className="mt-3 divide-y divide-slate-100">
+        {!groups
+          ? Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="flex items-center gap-3 py-3">
+                <Skeleton className="size-12" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              </div>
+            ))
+          : popular.map((service) => (
+              <Link
+                key={service.id}
+                href={`/services/${service.id}`}
+                className="flex items-center gap-3 py-3 transition-colors hover:bg-slate-50/80"
+              >
+                <ServiceImage service={service} className="size-12 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">{service.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {PROFESSION_LABEL[service.required_professional_type]} · {durationLabel(service.duration_minutes)}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-bold text-slate-900">{formatINR(service.base_price)}</p>
+                  <RatingPill avg={service.rating_avg} count={service.rating_count} />
+                </div>
+              </Link>
+            ))}
+      </div>
+      <Link href="/services" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+        See all services <Icon name="arrowRight" className="size-4" />
+      </Link>
+    </div>
+  );
+}
