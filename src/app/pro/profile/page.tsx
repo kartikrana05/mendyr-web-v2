@@ -4,11 +4,14 @@ import { useState } from "react";
 
 import { AreaPicker, RadiusPicker } from "@/components/area-picker";
 import type { Coords } from "@/components/location";
+import { Icon } from "@/components/icons";
+import { LanguageSwitch } from "@/components/language-switch";
 import { ProfileForm } from "@/components/profile-form";
 import { useToast } from "@/components/toast";
-import { Badge, Button, Card, Chip, Field, Input, PageHeader, Switch, Textarea } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, Chip, Field, Input, PageHeader, Switch, Textarea } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api";
-import { LANGUAGES, PROFESSION_LABEL, registrationLabel } from "@/lib/constants";
+import { useConfig } from "@/lib/config";
+import { PROFESSION_LABEL, registrationLabel } from "@/lib/constants";
 import { formatINR } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
 import type { MyService, ProfessionalProfile } from "@/lib/types";
@@ -43,6 +46,9 @@ function ProfessionalDetails() {
   );
   const [languages, setLanguages] = useState(profile.languages_spoken ?? []);
   const [bio, setBio] = useState(profile.bio ?? "");
+  const offered = useConfig("pro.settings").languages;
+  // Keep languages saved earlier selectable even if the portal list changed.
+  const languageOptions = [...offered, ...languages.filter((l) => !offered.includes(l))];
 
   return (
     <Card className="p-5">
@@ -62,7 +68,7 @@ function ProfessionalDetails() {
         <div>
           <p className="mb-2 text-sm font-medium text-slate-700">Languages</p>
           <div className="flex flex-wrap gap-2">
-            {LANGUAGES.map((language) => (
+            {languageOptions.map((language) => (
               <Chip
                 key={language}
                 selected={languages.includes(language)}
@@ -182,14 +188,56 @@ function ServicesOffered() {
   );
 }
 
+const VERIFICATION = {
+  approved: { tone: "green", label: "Verified", body: "Patients see a Verified badge on your profile." },
+  pending: { tone: "amber", label: "Awaiting verification", body: "Our team will review your profile shortly." },
+  in_review: { tone: "blue", label: "Under review", body: "We're checking your details now." },
+  rejected: { tone: "red", label: "Not approved", body: "Update your details or contact support for another review." },
+} as const;
+
+function VerificationStatus() {
+  const { profile } = useProfessional();
+  const meta = VERIFICATION[profile.verification_status];
+  return (
+    <Card className="flex items-start gap-3 p-5">
+      <Icon name="shield" className="mt-0.5 size-5 shrink-0 text-slate-400" />
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-2 font-semibold text-slate-900">
+          Verification <Badge tone={meta.tone}>{meta.label}</Badge>
+        </p>
+        <p className="mt-0.5 text-sm text-slate-500">
+          {profile.verification_status === "rejected" && profile.rejection_reason
+            ? `Reason: ${profile.rejection_reason}. `
+            : null}
+          {meta.body}
+        </p>
+      </div>
+    </Card>
+  );
+}
+
 export default function ProProfilePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="Profile" />
+      <VerificationStatus />
       <ProfileForm />
       <ProfessionalDetails />
       <ServiceArea />
       <ServicesOffered />
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <h2 className="font-semibold text-slate-900">Weekly timings</h2>
+          <p className="mt-0.5 text-sm text-slate-500">Only requests inside these hours reach you.</p>
+        </div>
+        <ButtonLink href="/pro/schedule" variant="outline" icon="clock">
+          Edit timings
+        </ButtonLink>
+      </Card>
+      <LanguageSwitch />
+      <ButtonLink href="/pro/support" variant="ghost" icon="help">
+        Help & support
+      </ButtonLink>
     </div>
   );
 }

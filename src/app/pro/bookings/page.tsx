@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { ProBookingRow } from "@/components/pro-cards";
-import { Alert, ButtonLink, Chip, EmptyState, PageHeader, PageSkeleton } from "@/components/ui";
+import { Alert, ButtonLink, Chip, EmptyState, ListSkeleton, PageHeader } from "@/components/ui";
 import { ACTIVE_STATUSES } from "@/lib/constants";
 import type { ProBooking } from "@/lib/types";
 
@@ -20,14 +20,18 @@ export default function ProBookingsPage() {
     upcoming: all
       .filter((b) => ACTIVE_STATUSES.includes(b.status))
       .sort((a, b) => a.scheduled_start_at.localeCompare(b.scheduled_start_at)),
-    completed: all.filter((b) => b.status === "completed"),
-    cancelled: all.filter((b) => ["cancelled", "no_show", "failed"].includes(b.status)),
+    completed: all
+      .filter((b) => b.status === "completed")
+      .sort((a, b) => b.scheduled_start_at.localeCompare(a.scheduled_start_at)),
+    cancelled: all
+      .filter((b) => ["cancelled", "no_show", "failed"].includes(b.status))
+      .sort((a, b) => b.scheduled_start_at.localeCompare(a.scheduled_start_at)),
   };
   const shown = groups[tab];
 
   return (
     <div>
-      <PageHeader title="My bookings" subtitle="Visits you've accepted." />
+      <PageHeader title="My visits" subtitle="Visits you've accepted." />
       <div className="mb-5 flex flex-wrap gap-2">
         {(["upcoming", "completed", "cancelled"] as Tab[]).map((t) => (
           <Chip key={t} selected={tab === t} onClick={() => setTab(t)}>
@@ -35,10 +39,10 @@ export default function ProBookingsPage() {
           </Chip>
         ))}
       </div>
-      {error ? (
+      {error && !data ? (
         <Alert tone="error">{error.message}</Alert>
       ) : loading ? (
-        <PageSkeleton />
+        <ListSkeleton rows={4} />
       ) : shown.length === 0 ? (
         <EmptyState
           icon="calendar"

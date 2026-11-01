@@ -1,12 +1,17 @@
 "use client";
 
 import { AlertCard, AlertStack, useArrivals } from "@/components/arrival-alerts";
+import { CANCELLED_BY_PRO_VIEW } from "@/lib/constants";
 import { formatDateTime, formatINR } from "@/lib/format";
 import type { BookingRequest, ProBooking } from "@/lib/types";
 
 const isNewRequest = (_request: BookingRequest, before: BookingRequest | undefined) => !before;
+// Only cancellations by someone else — the professional knows when they hand one back.
 const isNewlyCancelled = (booking: ProBooking, before: ProBooking | undefined) =>
-  booking.status === "cancelled" && before !== undefined && before.status !== "cancelled";
+  booking.status === "cancelled" &&
+  booking.cancelled_by !== "professional" &&
+  before !== undefined &&
+  before.status !== "cancelled";
 
 /**
  * Pops up over any /pro page when a poll brings a new open request, or shows that one of
@@ -30,10 +35,11 @@ export function ProAlerts({ requests, bookings }: { requests?: BookingRequest[];
           onDismiss={dismissCancelled}
         >
           <p className="mt-0.5 truncate text-sm text-slate-700">
-            {cancelled[0].service_name} · {cancelled[0].patient_name}
+            {cancelled[0].service_name} · {cancelled[0].contact_hidden ? `Patient ${cancelled[0].patient_ref}` : cancelled[0].patient_name}
           </p>
           <p className="text-xs text-slate-500">
-            Was on {formatDateTime(cancelled[0].scheduled_start_at)} · The patient cancelled
+            Was on {formatDateTime(cancelled[0].scheduled_start_at)} ·{" "}
+            {cancelled[0].cancelled_by ? CANCELLED_BY_PRO_VIEW[cancelled[0].cancelled_by] : "Cancelled"}
           </p>
         </AlertCard>
       )}

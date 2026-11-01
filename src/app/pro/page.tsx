@@ -6,12 +6,15 @@ import { useState } from "react";
 import { Icon, type IconName } from "@/components/icons";
 import { ProBookingRow, RequestCard } from "@/components/pro-cards";
 import { useToast } from "@/components/toast";
-import { Alert, Card, cn, EmptyState, SectionHeading, Switch } from "@/components/ui";
+import { Alert, Badge, ButtonLink, Card, cn, EmptyState, SectionHeading, Skeleton, Switch } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useConfig } from "@/lib/config";
 import { ACTIVE_STATUSES, PROFESSION_LABEL } from "@/lib/constants";
-import { formatINR, istDateKey } from "@/lib/format";
+import { summariseEarnings } from "@/lib/earnings";
+import { formatINR, whatsappLink } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
+import { useT } from "@/lib/i18n";
 import type { AvailabilitySlot, ProfessionalProfile } from "@/lib/types";
 
 import { useMyBookings, useOpenRequests, useProfessional } from "./professional-context";
@@ -28,17 +31,70 @@ function Stat({ icon, label, value, tone }: { icon: IconName; label: string; val
   );
 }
 
+/** Where the professional's verification stands — and what happens next. */
+function VerificationBanner({ profile }: { profile: ProfessionalProfile }) {
+  const support = useConfig("app.support");
+  const contact = support.whatsapp ? (
+    <a href={whatsappLink(support.whatsapp, "Hi Mendyr, about my professional verification")} target="_blank" rel="noreferrer" className="font-semibold underline">
+      WhatsApp our team
+    </a>
+  ) : (
+    <Link href="/pro/support" className="font-semibold underline">
+      contact support
+    </Link>
+  );
+  switch (profile.verification_status) {
+    case "approved":
+      return null;
+    case "pending":
+      return (
+        <Alert tone="info" title="Your profile is waiting for verification">
+          Our team checks every professional before their first visit — usually within 1–2 working days. You&apos;ll
+          start seeing requests as soon as you&apos;re approved. Meanwhile, set your{" "}
+          <Link href="/pro/schedule" className="font-semibold underline">
+            timings
+          </Link>{" "}
+          and{" "}
+          <Link href="/pro/profile" className="font-semibold underline">
+            services
+          </Link>
+          .
+        </Alert>
+      );
+    case "in_review":
+      return (
+        <Alert tone="info" title="Verification in progress">
+          We&apos;re reviewing your details now. We&apos;ll notify you as soon as there&apos;s a decision.
+        </Alert>
+      );
+    case "rejected":
+      return (
+        <Alert tone="error" title="Your profile wasn't approved">
+          {profile.rejection_reason ? <>Reason: {profile.rejection_reason}. </> : null}
+          Update your details in your profile, or {contact} to ask for another review.
+        </Alert>
+      );
+    default:
+      return null;
+  }
+}
+
 export default function ProDashboardPage() {
   const { user } = useAuth();
+  const t = useT();
   const { profile, setProfile } = useProfessional();
   const toast = useToast();
   const requests = useOpenRequests();
   const bookings = useMyBookings();
   const slots = useApi<AvailabilitySlot[]>("/professionals/me/availability/slots");
-  const [toggling, setToggling] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const approved = profile.verification_status === "approved";
 
+  // Optimistic: flip at once, put it back if the save fails.
   async function setAccepting(on: boolean) {
-    setToggling(true);
+    const before = profile;
+    setProfile({ ...profile, is_accepting_bookings: on });
+    setSaving(true);
     try {
       const updated = await api<ProfessionalProfile>("/professionals/me", {
         method: "PATCH",
@@ -46,11 +102,11 @@ export default function ProDashboardPage() {
       });
       setProfile(updated);
       void requests.reload();
-      toast.success(on ? "You're accepting new requests." : "New requests paused.");
     } catch (err) {
+      setProfile(before);
       toast.error(errorMessage(err));
     } finally {
-      setToggling(false);
+      setSaving(false);
     }
   }
 
@@ -58,52 +114,62 @@ export default function ProDashboardPage() {
   const upcoming = all
     .filter((b) => ACTIVE_STATUSES.includes(b.status))
     .sort((a, b) => a.scheduled_start_at.localeCompare(b.scheduled_start_at));
-  const thisMonth = istDateKey(new Date()).slice(0, 7);
-  const monthEarnings = all
-    .filter((b) => b.status === "completed" && b.completed_at && istDateKey(new Date(b.completed_at)).startsWith(thisMonth))
-    .reduce((sum, b) => sum + b.earning_amount, 0);
+  const earnings = summariseEarnings(all);
   const openRequests = requests.data ?? [];
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Hi, {user?.full_name.split(" ")[0]}</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {PROFESSION_LABEL[profile.professional_type]} · serving within {profile.service_radius_km} km
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-slate-900">
+            Hi, {user?.full_name.split(" ")[0]}
+            {approved && (
+              <Badge tone="green">
+                <Icon name="shield" className="size-3.5" /> {t("common.verified")}
+              </Badge>
+            )}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {PROFESSION_LABEL[profile.professional_type]} · serving within {profile.service_radius_km} km
+          </p>
+        </div>
       </div>
 
-      {profile.verification_status !== "approved" && (
-        <Alert tone="warning" title="Your profile is being reviewed">
-          {profile.verification_status === "rejected"
-            ? `It wasn't approved: ${profile.rejection_reason ?? "please contact support."}`
-            : "You'll start seeing requests once it's approved."}
-        </Alert>
-      )}
+      <VerificationBanner profile={profile} />
 
-      <Card className="flex items-center justify-between gap-4 p-5">
-        <div>
-          <p className="font-semibold text-slate-900">
-            {profile.is_accepting_bookings ? "Accepting new requests" : "Not accepting new requests"}
-          </p>
-          <p className="mt-0.5 text-sm text-slate-500">
-            {profile.is_accepting_bookings
-              ? "Requests near you, inside your timings, show up below."
-              : "Turn this on when you're ready to take visits."}
-          </p>
+      <Card className={cn("flex items-center justify-between gap-4 p-5", profile.is_accepting_bookings && approved && "border-emerald-200")}>
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "size-3 shrink-0 rounded-full",
+              profile.is_accepting_bookings && approved ? "bg-emerald-500" : "bg-slate-300",
+            )}
+          />
+          <div>
+            <p className="font-semibold text-slate-900">
+              {profile.is_accepting_bookings ? "Accepting new requests" : "Not accepting new requests"}
+            </p>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {!approved
+                ? "Requests start once your profile is approved."
+                : profile.is_accepting_bookings
+                  ? "Requests near you, inside your timings, show up below."
+                  : "Turn this on when you're ready to take visits."}
+            </p>
+          </div>
         </div>
         <Switch
           checked={profile.is_accepting_bookings}
-          disabled={toggling}
+          disabled={saving}
           label="Accepting new requests"
           onChange={setAccepting}
         />
       </Card>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat icon="rupee" label="Earned this month" value={formatINR(monthEarnings)} tone="bg-emerald-50 text-emerald-600" />
-        <Stat icon="check" label="Visits completed" value={String(profile.total_visits_completed)} tone="bg-sky-50 text-sky-600" />
-        <Stat icon="calendar" label="Upcoming visits" value={String(upcoming.length)} tone="bg-violet-50 text-violet-600" />
+        <Stat icon="rupee" label="Earned today" value={formatINR(earnings.today)} tone="bg-emerald-50 text-emerald-600" />
+        <Stat icon="wallet" label="This week" value={formatINR(earnings.week)} tone="bg-teal-50 text-teal-700" />
+        <Stat icon="calendar" label="Upcoming visits" value={String(upcoming.length)} tone="bg-brand-50 text-brand-700" />
         <Stat
           icon="star"
           label={profile.total_ratings ? `${profile.total_ratings} ratings` : "No ratings yet"}
@@ -112,51 +178,13 @@ export default function ProDashboardPage() {
         />
       </div>
 
-      {slots.data?.length === 0 && (
-        <Alert tone="info" title="Set your timings">
-          Right now you&apos;ll see requests for any time of day.{" "}
-          <Link href="/pro/schedule" className="font-semibold underline">
-            Choose when you&apos;re free
-          </Link>{" "}
-          to only see the ones that fit.
-        </Alert>
-      )}
-
-      <section>
-        <SectionHeading
-          title={`New requests near you${openRequests.length ? ` (${openRequests.length})` : ""}`}
-          action={
-            openRequests.length > 2 && (
-              <Link href="/pro/requests" className="text-sm font-semibold text-brand-700">
-                See all
-              </Link>
-            )
-          }
-        />
-        {requests.loading ? (
-          <div className="h-32 animate-pulse rounded-2xl bg-slate-200/60" />
-        ) : openRequests.length === 0 ? (
-          <EmptyState icon="bell" title="No new requests right now">
-            {profile.is_accepting_bookings
-              ? "We'll show requests here as patients near you book. This page refreshes on its own."
-              : "You've paused new requests."}
-          </EmptyState>
-        ) : (
-          <div className="space-y-3">
-            {openRequests.slice(0, 2).map((request) => (
-              <RequestCard key={request.id} request={request} onGone={requests.reload} />
-            ))}
-          </div>
-        )}
-      </section>
-
       {upcoming.length > 0 && (
         <section>
           <SectionHeading
-            title="Your upcoming visits"
+            title="Your next visits"
             action={
               <Link href="/pro/bookings" className="text-sm font-semibold text-brand-700">
-                All bookings
+                {t("common.seeAll")}
               </Link>
             }
           />
@@ -167,6 +195,58 @@ export default function ProDashboardPage() {
           </div>
         </section>
       )}
+
+      {approved && slots.data?.length === 0 && (
+        <Alert tone="info" title="Set your timings">
+          Right now you&apos;ll see requests for any time of day.{" "}
+          <Link href="/pro/schedule" className="font-semibold underline">
+            Choose when you&apos;re free
+          </Link>{" "}
+          to only see the ones that fit.
+        </Alert>
+      )}
+
+      {approved && (
+        <section>
+          <SectionHeading
+            title={`New requests near you${openRequests.length ? ` (${openRequests.length})` : ""}`}
+            action={
+              openRequests.length > 2 && (
+                <Link href="/pro/requests" className="text-sm font-semibold text-brand-700">
+                  {t("common.seeAll")}
+                </Link>
+              )
+            }
+          />
+          {requests.loading ? (
+            <Skeleton className="h-32 rounded-(--radius-card)" />
+          ) : openRequests.length === 0 ? (
+            <EmptyState icon="inbox" title="No new requests right now">
+              {profile.is_accepting_bookings
+                ? "We'll show requests here as patients near you book. This page refreshes on its own."
+                : "You've paused new requests."}
+            </EmptyState>
+          ) : (
+            <div className="space-y-3">
+              {openRequests.slice(0, 2).map((request) => (
+                <RequestCard key={request.id} request={request} onGone={requests.reload} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        <ButtonLink href="/pro/earnings" variant="outline" icon="rupee">
+          Earnings
+        </ButtonLink>
+        <ButtonLink href="/pro/schedule" variant="outline" icon="clock">
+          {t("nav.timings")}
+        </ButtonLink>
+        <ButtonLink href="/pro/support" variant="outline" icon="help">
+          {t("nav.help")}
+        </ButtonLink>
+      </div>
     </div>
   );
 }

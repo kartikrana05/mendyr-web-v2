@@ -10,7 +10,8 @@ import { Alert, Button, Card, Chip, cn, Field, Input, Textarea } from "@/compone
 import { slotsAreValid, WeeklySchedule } from "@/components/weekly-schedule";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { LANGUAGES, PROFESSIONS, registrationLabel } from "@/lib/constants";
+import { useConfig } from "@/lib/config";
+import { PROFESSIONS, registrationLabel } from "@/lib/constants";
 import { formatINR } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
 import type { AvailabilitySlot, ProfessionalProfile, ProfessionalType, Service } from "@/lib/types";
@@ -32,7 +33,8 @@ export default function OnboardingPage() {
   const [languages, setLanguages] = useState<string[]>(["English", "Hindi"]);
   const [bio, setBio] = useState("");
   const [area, setArea] = useState<Coords | null>(null);
-  const [radius, setRadius] = useState(10);
+  const proSettings = useConfig("pro.settings");
+  const [radius, setRadius] = useState(proSettings.default_radius_km);
   const [deselected, setDeselected] = useState<string[]>([]);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -165,7 +167,7 @@ export default function OnboardingPage() {
                 <div>
                   <p className="mb-2 text-sm font-medium text-slate-700">Languages you speak</p>
                   <div className="flex flex-wrap gap-2">
-                    {LANGUAGES.map((language) => (
+                    {proSettings.languages.map((language) => (
                       <Chip
                         key={language}
                         selected={languages.includes(language)}

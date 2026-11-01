@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { Icon } from "@/components/icons";
 import { RequestCard } from "@/components/pro-cards";
-import { Alert, Card, PageHeader, PageSkeleton } from "@/components/ui";
+import { Alert, Card, EmptyState, ListSkeleton, PageHeader } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import type { AvailabilitySlot } from "@/lib/types";
 
@@ -30,10 +30,16 @@ export default function ProRequestsPage() {
         title="New requests"
         subtitle="Visits near you that start inside your timings. First to accept gets the booking."
       />
-      {requests.error ? (
+      {profile.verification_status !== "approved" ? (
+        <EmptyState icon="shield" title="Requests start once you're verified">
+          {profile.verification_status === "rejected"
+            ? "Your profile wasn't approved. See the dashboard for the reason and next steps."
+            : "Our team is reviewing your profile. We'll notify you when it's approved."}
+        </EmptyState>
+      ) : requests.error && !requests.data ? (
         <Alert tone="error">{requests.error.message}</Alert>
       ) : requests.loading ? (
-        <PageSkeleton />
+        <ListSkeleton rows={3} />
       ) : requests.data && requests.data.length > 0 ? (
         <div className="space-y-3">
           {requests.data.map((request) => (

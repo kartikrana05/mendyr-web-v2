@@ -4,23 +4,25 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect } from "react";
 
 import { AppShell, type NavItem } from "@/components/app-shell";
+import { InboxProvider } from "@/components/notifications";
 import { Logo } from "@/components/brand";
 import { Icon } from "@/components/icons";
 import { Alert, PageSkeleton } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { usePollMs } from "@/lib/config";
 import { useApi } from "@/lib/hooks";
+import { type Translate, useT } from "@/lib/i18n";
 import type { BookingRequest, ProBooking, ProfessionalProfile } from "@/lib/types";
 
 import { ProAlerts } from "./pro-alerts";
 
-function navFor(openRequests: number): NavItem[] {
+function navFor(openRequests: number, t: Translate): NavItem[] {
   return [
-    { href: "/pro", label: "Dashboard", icon: "home", exact: true },
-    { href: "/pro/requests", label: "Requests", icon: "bell", badge: openRequests },
-    { href: "/pro/bookings", label: "Bookings", icon: "calendar" },
-    { href: "/pro/schedule", label: "Timings", icon: "clock" },
-    { href: "/pro/profile", label: "Profile", icon: "user" },
+    { href: "/pro", label: t("nav.dashboard"), icon: "home", exact: true },
+    { href: "/pro/requests", label: t("nav.requests"), icon: "inbox", badge: openRequests },
+    { href: "/pro/bookings", label: t("nav.visits"), icon: "calendar" },
+    { href: "/pro/earnings", label: t("nav.earnings"), icon: "rupee" },
+    { href: "/pro/profile", label: t("nav.profile"), icon: "user" },
   ];
 }
 
@@ -73,6 +75,7 @@ function OnboardingShell({ children }: { children: React.ReactNode }) {
 export function ProfessionalProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useT();
   const onOnboarding = pathname === "/pro/onboarding";
   const { data: profile, error, reload, mutate } = useApi<ProfessionalProfile>("/professionals/me");
   const needsOnboarding = error?.status === 404;
@@ -114,6 +117,13 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
           <Alert tone="error" title="Couldn't load your profile">
             {error.message}
           </Alert>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            className="mt-4 text-sm font-semibold text-brand-700"
+          >
+            Try again
+          </button>
         </div>
       );
     }
@@ -121,10 +131,14 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
   }
   return (
     <ProfessionalContext.Provider value={value}>
-      <AppShell nav={navFor(requests.data?.length ?? 0)}>
-        {children}
-        <ProAlerts requests={requests.data} bookings={bookings.data} />
-      </AppShell>
+      <InboxProvider>
+        {(unread) => (
+          <AppShell nav={navFor(requests.data?.length ?? 0, t)} bell={{ href: "/pro/notifications", count: unread }}>
+            {children}
+            <ProAlerts requests={requests.data} bookings={bookings.data} />
+          </AppShell>
+        )}
+      </InboxProvider>
     </ProfessionalContext.Provider>
   );
 }

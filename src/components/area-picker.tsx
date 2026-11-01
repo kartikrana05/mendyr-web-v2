@@ -6,8 +6,8 @@ import { Icon } from "@/components/icons";
 import { currentPosition, locatePincode, reverseGeocode, type Coords } from "@/components/location";
 import { Alert, Button, Chip, Field, Input } from "@/components/ui";
 import { errorMessage } from "@/lib/api";
+import { useConfig } from "@/lib/config";
 
-export const RADIUS_OPTIONS = [3, 5, 10, 15, 20, 30];
 
 /** Where a professional works from: their device location, or a pincode they type. */
 export function AreaPicker({ value, onChange }: { value: Coords | null; onChange: (coords: Coords) => void }) {
@@ -92,12 +92,16 @@ export function AreaPicker({ value, onChange }: { value: Coords | null; onChange
   );
 }
 
+/** Travel distance chips, from `pro.settings.radius_options_km`. */
 export function RadiusPicker({ value, onChange }: { value: number; onChange: (km: number) => void }) {
+  const configured = useConfig("pro.settings").radius_options_km;
+  // Keep a saved radius selectable even if the portal no longer offers it.
+  const options = configured.includes(value) ? configured : [...configured, value].sort((a, b) => a - b);
   return (
     <div>
       <p className="mb-2 text-sm font-medium text-slate-700">How far will you travel?</p>
       <div className="flex flex-wrap gap-2">
-        {RADIUS_OPTIONS.map((km) => (
+        {options.map((km) => (
           <Chip key={km} selected={value === km} onClick={() => onChange(km)}>
             {km} km
           </Chip>
