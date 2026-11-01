@@ -6,7 +6,7 @@ on:
     branches:
       - feat/capacitor-app
 
-jobs:
+jobs: 
   example:
     runs-on: ubuntu-latest
     steps:
