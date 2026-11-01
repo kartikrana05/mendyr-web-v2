@@ -317,7 +317,14 @@ export function ConfigProvider({ role, children }: { role: ConfigRole; children:
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
+    // Portal changes should reach a tab that stays open too: re-check every minute while visible.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      last = Date.now();
+      void refresh();
+    }, REFRESH_AFTER_MS);
     return () => {
+      window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
