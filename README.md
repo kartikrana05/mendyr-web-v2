@@ -45,16 +45,21 @@ collected after the visit for now — nothing is charged online.
 |---|---|---|---|
 | `/` | everyone | Landing page | `GET /services/categories`, `GET /services` |
 | `/services` | everyone | Full catalogue | same |
+| `/services/[id]` | everyone | One service: includes, FAQs, rating | `GET /services/{id}` |
 | `/login`, `/register/*` | everyone | Email + password auth | `POST /auth/login`, `POST /auth/register` |
 | `/patient` | patient | Upcoming visits, quick booking | `GET /bookings`, `GET /addresses` |
 | `/patient/book` | patient | Booking flow | `POST /bookings/quote`, `GET /professionals/nearby`, `POST /addresses`, `POST /bookings` |
 | `/patient/bookings[/id]` | patient | Track, cancel, rate | `GET /bookings/{id}`, `POST /bookings/{id}/cancel`, `POST /reviews` |
-| `/patient/account` | patient | Profile, saved addresses | `PATCH /users/me`, `/addresses` CRUD |
+| `/patient/account` | patient | Profile, saved addresses, language | `PATCH /users/me`, `/addresses` CRUD |
+| `/patient/notifications`, `/pro/notifications` | signed in | Inbox, unread bell | `GET /notifications`, `POST /notifications/read-all`, `…/{id}/read` |
+| `/patient/support`, `/pro/support` | signed in | Help, WhatsApp, SOS / ambulance, FAQs | config `app.support` |
 | `/pro/onboarding` | professional | First-time profile setup | `POST /professionals/onboard`, `PUT /professionals/me/availability/slots` |
 | `/pro` | professional | Dashboard, accepting switch, earnings | `GET /professionals/me`, `PATCH /professionals/me`, `GET /bookings/professional/*` |
 | `/pro/requests` | professional | Open requests near them | `GET /bookings/professional/requests`, `POST /bookings/{id}/accept` |
 | `/pro/bookings[/id]` | professional | Their visits; start, complete, hand back | `GET /bookings/professional/{id}`, `POST /bookings/{id}/check-in`, `…/check-out`, `…/release` |
 | `/pro/schedule` | professional | Weekly timings | `GET`/`PUT /professionals/me/availability/slots` |
+| `/pro/earnings` | professional | Today / week / month from completed visits | `GET /bookings/professional/mine` |
+| `/staff` | admin, ops | Points team accounts to the config portal | — |
 | `/pro/profile` | professional | Details, service area, services | `PATCH /professionals/me`, `/professionals/me/services` |
 
 Address and service-area forms never ask for coordinates: "Use my current location" uses the
@@ -72,6 +77,15 @@ CORS, no third-party-cookie problems in Safari, and no token ever touches JavaSc
   calls `POST /auth/token/refresh` once (the refresh cookie is sent automatically) and retries.
 - `src/lib/auth.tsx` holds the signed-in user (`GET /auth/me`); `RoleGate` keeps patients and
   professionals in their own areas and sends signed-out visitors to `/login?next=…`.
+
+### Server-driven config
+
+`src/lib/config.tsx` loads `GET /configs/app?role=…&platform=web` — feature flags, theme
+colours, home sections, banners, copy overrides, support numbers, booking rules, polling
+intervals. It never blocks rendering: the bundled defaults (or the last bundle cached in
+localStorage) are used until the fresh one arrives, and it refreshes when the tab regains
+focus. `useFeature`, `useRules`, `useConfig` and `usePollMs` read it. Strings live in
+`src/lib/strings.ts` (English and Hindi); `app.copy.locales` overrides any key.
 
 ### Code layout
 
