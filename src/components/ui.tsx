@@ -45,7 +45,7 @@ const SIZES: Record<Size, string> = {
 
 function buttonClasses(variant: Variant, size: Size, className?: string) {
   return cn(
-    "inline-flex items-center justify-center rounded-xl font-semibold transition-colors",
+    "inline-flex items-center justify-center rounded-xl font-semibold transition duration-150 ease-out active:scale-[0.97]",
     "focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
     VARIANTS[variant],
     SIZES[size],
@@ -237,7 +237,7 @@ export function Switch({
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn("rounded-2xl border border-slate-200/80 bg-white shadow-xs", className)}>
+    <div className={cn("rounded-(--radius-card) border border-slate-200/80 bg-white shadow-xs", className)}>
       {children}
     </div>
   );
@@ -287,14 +287,41 @@ export function Spinner({ className = "size-5" }: { className?: string }) {
   );
 }
 
-export function PageSpinner({ label = "Loading…" }: { label?: string }) {
+/** A grey placeholder block that pulses — size it with `className`. */
+export function Skeleton({ className }: { className?: string }) {
+  return <div aria-hidden="true" className={cn("animate-pulse rounded-xl bg-slate-200/70", className)} />;
+}
+
+/** Placeholder rows shaped like list cards. */
+export function ListSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-slate-500">
-      <Spinner className="size-7 text-brand-600" />
-      <p className="text-sm">{label}</p>
+    <div className="space-y-3" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="flex items-center gap-4 rounded-(--radius-card) border border-slate-200/80 bg-white p-4">
+          <Skeleton className="size-11 rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-3.5 w-1/3" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
+
+/** First-load placeholder for a whole page: a title and a few cards. Not a spinner. */
+export function PageSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-56" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </div>
+      <ListSkeleton rows={rows} />
+    </div>
+  );
+}
+
 
 const ALERT_TONES = {
   info: { box: "border-sky-200 bg-sky-50 text-sky-900", icon: "info" as const },
@@ -351,7 +378,21 @@ export function EmptyState({
 
 const AVATAR_SIZES = { sm: "size-9 text-sm", md: "size-11", lg: "size-14 text-lg" };
 
-export function Avatar({ name, size = "md" }: { name: string; size?: keyof typeof AVATAR_SIZES }) {
+export function Avatar({
+  name,
+  size = "md",
+  src,
+}: {
+  name: string;
+  size?: keyof typeof AVATAR_SIZES;
+  src?: string | null;
+}) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- remote avatar on an unknown host
+      <img src={src} alt="" loading="lazy" className={cn("shrink-0 rounded-full object-cover", AVATAR_SIZES[size])} />
+    );
+  }
   return (
     <div
       className={cn(

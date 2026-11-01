@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
 
-import { ToastProvider } from "@/components/toast";
-import { AuthProvider } from "@/lib/auth";
+import { Providers } from "@/components/providers";
 
 import "./globals.css";
 
@@ -24,9 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${inter.variable} ${outfit.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
-        <AuthProvider>
-          <ToastProvider>{children}</ToastProvider>
-        </AuthProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

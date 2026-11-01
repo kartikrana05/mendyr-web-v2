@@ -6,8 +6,9 @@ import { createContext, useContext, useEffect } from "react";
 import { AppShell, type NavItem } from "@/components/app-shell";
 import { Logo } from "@/components/brand";
 import { Icon } from "@/components/icons";
-import { Alert, PageSpinner } from "@/components/ui";
+import { Alert, PageSkeleton } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
+import { usePollMs } from "@/lib/config";
 import { useApi } from "@/lib/hooks";
 import type { BookingRequest, ProBooking, ProfessionalProfile } from "@/lib/types";
 
@@ -76,10 +77,10 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
   const { data: profile, error, reload, mutate } = useApi<ProfessionalProfile>("/professionals/me");
   const needsOnboarding = error?.status === 404;
   const requests = useApi<BookingRequest[]>(profile ? "/bookings/professional/requests" : null, {
-    pollMs: 15_000,
+    pollMs: usePollMs("requests"),
   });
   const bookings = useApi<ProBooking[]>(profile ? "/bookings/professional/mine?page_size=100" : null, {
-    pollMs: 30_000,
+    pollMs: usePollMs("lists"),
   });
   const { reload: reloadRequests } = requests;
   const { reload: reloadBookings } = bookings;
@@ -99,7 +100,7 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
   const value: ProfessionalContextValue = { profile: profile ?? null, setProfile: mutate, reload, requests, bookings };
 
   if (onOnboarding) {
-    if (!needsOnboarding) return <PageSpinner />; // loading, or onboarded and redirecting
+    if (!needsOnboarding) return <PageSkeleton />; // loading, or onboarded and redirecting
     return (
       <ProfessionalContext.Provider value={value}>
         <OnboardingShell>{children}</OnboardingShell>
@@ -116,7 +117,7 @@ export function ProfessionalProvider({ children }: { children: React.ReactNode }
         </div>
       );
     }
-    return <PageSpinner />;
+    return <PageSkeleton />;
   }
   return (
     <ProfessionalContext.Provider value={value}>

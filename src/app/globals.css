@@ -4,23 +4,62 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand: the Mendyr deep blue (matches the original Mendyr app). 600 is the primary
-     #1262E2, 400 its light tint #63B0F2, 700 its dark shade #0F4ABF. Change these to
-     re-skin the whole app. */
-  --color-brand-50: #eef5fe;
-  --color-brand-100: #dbe9fd;
-  --color-brand-200: #bed7fb;
-  --color-brand-300: #91c1f7;
-  --color-brand-400: #63b0f2;
-  --color-brand-500: #3a86ea;
+  /* Brand: 600 is the primary and 700 primary-dark. Both are overridden at runtime from
+     the config bundle's `app.theme` (see lib/config.tsx); the rest of the scale is mixed
+     from them so a new primary re-skins everything. */
   --color-brand-600: #1262e2;
   --color-brand-700: #0f4abf;
-  --color-brand-800: #123f99;
-  --color-brand-900: #14377a;
+  --color-brand-50: color-mix(in srgb, var(--color-brand-600) 6%, white);
+  --color-brand-100: color-mix(in srgb, var(--color-brand-600) 13%, white);
+  --color-brand-200: color-mix(in srgb, var(--color-brand-600) 26%, white);
+  --color-brand-300: color-mix(in srgb, var(--color-brand-600) 45%, white);
+  --color-brand-400: color-mix(in srgb, var(--color-brand-600) 65%, white);
+  --color-brand-500: color-mix(in srgb, var(--color-brand-600) 85%, white);
+  --color-brand-800: color-mix(in srgb, var(--color-brand-700) 82%, black);
+  --color-brand-900: color-mix(in srgb, var(--color-brand-700) 65%, black);
 
-  /* Supporting tokens from the original theme. */
-  --color-accent: #2165bf;
+  /* Accent (teal) and semantic colours, also from `app.theme`. */
+  --color-teal: #0ea5a4;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-accent: var(--color-teal);
   --color-background: #f7f9fc;
+
+  --radius-card: 16px;
+
+  --animate-fade-in: fade-in 180ms ease-out;
+  --animate-sheet-up: sheet-up 220ms ease-out;
+  --animate-rise: rise 200ms ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes sheet-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 :root {
@@ -64,4 +103,21 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Horizontal chip/card rails: scroll without a visible bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

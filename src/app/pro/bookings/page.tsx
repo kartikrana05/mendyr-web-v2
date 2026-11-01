@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { ProBookingRow } from "@/components/pro-cards";
-import { Alert, ButtonLink, Chip, EmptyState, PageHeader, PageSpinner } from "@/components/ui";
+import { Alert, ButtonLink, Chip, EmptyState, PageHeader, PageSkeleton } from "@/components/ui";
 import { ACTIVE_STATUSES } from "@/lib/constants";
 import type { ProBooking } from "@/lib/types";
 
@@ -38,7 +38,7 @@ export default function ProBookingsPage() {
       {error ? (
         <Alert tone="error">{error.message}</Alert>
       ) : loading ? (
-        <PageSpinner />
+        <PageSkeleton />
       ) : shown.length === 0 ? (
         <EmptyState
           icon="calendar"

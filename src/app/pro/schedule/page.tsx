@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { useToast } from "@/components/toast";
-import { Alert, Button, Card, PageHeader, PageSpinner } from "@/components/ui";
+import { Alert, Button, Card, PageHeader, PageSkeleton } from "@/components/ui";
 import { normalizeSlots, slotsAreValid, WeeklySchedule } from "@/components/weekly-schedule";
 import { api, errorMessage } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
@@ -62,7 +62,7 @@ export default function SchedulePage() {
       {error ? (
         <Alert tone="error">{error.message}</Alert>
       ) : !data ? (
-        <PageSpinner />
+        <PageSkeleton />
       ) : (
         // Keyed on the saved schedule so the editor resets to it after each save.
         <ScheduleEditor key={JSON.stringify(data)} initial={normalizeSlots(data)} onSaved={reload} />

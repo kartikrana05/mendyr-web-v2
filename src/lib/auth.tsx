@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { api, SESSION_ENDED } from "@/lib/api";
+import { clearApiMemory } from "@/lib/hooks";
 import type { Role, TokenPair, User } from "@/lib/types";
 
 export interface RegisterInput {
@@ -25,7 +26,13 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Mendyr team accounts (admin, ops) use the config portal, not this site. */
+export function isStaff(role: Role): boolean {
+  return role !== "patient" && role !== "professional";
+}
+
 export function homeFor(role: Role): string {
+  if (isStaff(role)) return "/staff";
   return role === "professional" ? "/pro" : "/patient";
 }
 
@@ -46,7 +53,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // A dead session signs the user out; `RoleGate` then sends them to log in and back here.
   useEffect(() => {
-    const signOut = () => setUser(null);
+    const signOut = () => {
+      clearApiMemory();
+      setUser(null);
+    };
     window.addEventListener(SESSION_ENDED, signOut);
     return () => window.removeEventListener(SESSION_ENDED, signOut);
   }, []);
@@ -70,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api("/auth/logout", { method: "POST" });
     } finally {
+      clearApiMemory();
       setUser(null);
     }
   }, []);

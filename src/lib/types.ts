@@ -1,7 +1,7 @@
 // Shapes returned by the Mendyr API (the `data` of each `{success, data, meta, error}`
 // envelope). Mirrors app/schemas/* in Mendyr-Backend — keep the two in step.
 
-export type Role = "patient" | "professional" | "admin" | "ops";
+export type Role = "patient" | "professional" | "admin" | "super_admin" | "ops";
 
 export type ProfessionalType =
   | "nurse"
@@ -65,6 +65,20 @@ export interface Service {
   base_price: number;
   is_recurring_eligible: boolean;
   requires_prescription: boolean;
+  image_url?: string | null;
+  tagline?: string | null;
+  badge?: string | null;
+  includes?: string[];
+  excludes?: string[];
+  faqs?: Faq[];
+  rating_avg?: number | null;
+  rating_count?: number;
+  bookings_count?: number;
+}
+
+export interface Faq {
+  q: string;
+  a: string;
 }
 
 export interface Address {
@@ -108,7 +122,19 @@ export interface NearbyProfessional extends PublicProfessional {
 }
 
 export interface AssignedProfessional extends PublicProfessional {
-  phone_number: string;
+  /** Withheld (null) once contact details are hidden — never render it as a dial link then. */
+  phone_number: string | null;
+  user_ref: string;
+  is_verified: boolean;
+  gender: string;
+}
+
+export type CancelledBy = "patient" | "professional" | "admin" | "system";
+
+export interface StatusEvent {
+  status: BookingStatus;
+  at: string;
+  note: string | null;
 }
 
 /** A booking as its patient sees it. */
@@ -123,13 +149,25 @@ export interface Booking {
   scheduled_end_at: string;
   base_price: number;
   discount_amount: number;
+  /** Mendyr's commission, taken from the professional's payout — never shown to patients. */
+  platform_fee: number;
   tax_amount: number;
   total_amount: number;
   patient_notes: string | null;
   cancellation_reason: string | null;
+  cancellation_fee_amount: number;
+  cancelled_by: CancelledBy | null;
   professional: AssignedProfessional | null;
   visit_summary_notes: string | null;
+  vitals_recorded: string | null;
   review_rating: number | null;
+  visit_pin: string | null;
+  preferred_gender: string | null;
+  en_route_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  contact_hidden: boolean;
+  timeline: StatusEvent[];
   created_at: string;
 }
 
@@ -175,6 +213,7 @@ export interface BookingRequest {
   distance_km: number;
   earning_amount: number;
   patient_notes: string | null;
+  preferred_gender: string | null;
   created_at: string;
 }
 
@@ -189,15 +228,22 @@ export interface ProBooking {
   address: string;
   landmark: string | null;
   instructions: string | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   patient_name: string;
-  patient_phone: string;
+  patient_phone: string | null;
+  patient_ref: string;
   patient_notes: string | null;
   earning_amount: number;
+  en_route_at: string | null;
   started_at: string | null;
   completed_at: string | null;
   visit_summary_notes: string | null;
+  vitals_recorded: string | null;
+  cancellation_reason: string | null;
+  cancelled_by: CancelledBy | null;
+  requires_visit_pin: boolean;
+  contact_hidden: boolean;
   created_at: string;
 }
 
@@ -230,4 +276,19 @@ export interface GeoAddress {
   city: string | null;
   state: string | null;
   pincode: string | null;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string | null;
+  body: string;
+  template_key: string;
+  data: Record<string, unknown> | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationInbox {
+  items: AppNotification[];
+  unread_count: number;
 }

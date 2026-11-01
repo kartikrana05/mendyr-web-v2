@@ -15,7 +15,7 @@ import {
   Card,
   Chip,
   cn,
-  PageSpinner,
+  PageSkeleton,
   Spinner,
   Stars,
   Textarea,
@@ -23,6 +23,7 @@ import {
 import { api, errorMessage } from "@/lib/api";
 import { ACTIVE_STATUSES, CANCELLABLE_STATUSES, PROFESSION_LABEL } from "@/lib/constants";
 import { displayPhone, durationLabel, formatDateTime, formatINR, formatTime } from "@/lib/format";
+import { usePollMs } from "@/lib/config";
 import { useApi } from "@/lib/hooks";
 import type { Booking } from "@/lib/types";
 
@@ -184,10 +185,11 @@ function CancelPanel({ booking, onCancelled }: { booking: Booking; onCancelled: 
 export function PatientBookingDetail() {
   const { id } = useParams<{ id: string }>();
   const [live, setLive] = useState(true);
+  const activeMs = usePollMs("active_booking");
   // Poll while something can still change on the other side (a professional accepting,
   // starting or completing the visit).
   const { data: booking, error, mutate, reload } = useApi<Booking>(`/bookings/${id}`, {
-    pollMs: live ? 10_000 : undefined,
+    pollMs: live ? activeMs : undefined,
   });
   const isLive = booking ? ACTIVE_STATUSES.includes(booking.status) : true;
   if (live !== isLive) setLive(isLive);
@@ -202,7 +204,7 @@ export function PatientBookingDetail() {
       </div>
     );
   }
-  if (!booking) return <PageSpinner />;
+  if (!booking) return <PageSkeleton />;
 
   const pro = booking.professional;
   const minutes = (Date.parse(booking.scheduled_end_at) - Date.parse(booking.scheduled_start_at)) / 60_000;
@@ -243,7 +245,7 @@ export function PatientBookingDetail() {
               {pro.languages_spoken?.length ? ` · ${pro.languages_spoken.join(", ")}` : null}
             </p>
           </div>
-          {booking.status !== "cancelled" && (
+          {!booking.contact_hidden && pro.phone_number && (
             <a
               href={`tel:${pro.phone_number}`}
               className="flex shrink-0 items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"

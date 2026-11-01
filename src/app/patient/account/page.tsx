@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { AddressForm, addressLine } from "@/components/address-form";
 import { Icon } from "@/components/icons";
+import { LanguageSwitch } from "@/components/language-switch";
+import { ConfirmDialog } from "@/components/modal";
 import { ProfileForm } from "@/components/profile-form";
 import { useToast } from "@/components/toast";
 import { Badge, Button, Card, PageHeader, SectionHeading } from "@/components/ui";
@@ -16,6 +18,7 @@ export default function PatientAccountPage() {
   const addresses = useApi<Address[]>("/addresses");
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Address | null>(null);
 
   async function makeDefault(address: Address) {
     setBusy(address.id);
@@ -30,7 +33,6 @@ export default function PatientAccountPage() {
   }
 
   async function remove(address: Address) {
-    if (!window.confirm(`Delete the "${address.label}" address?`)) return;
     setBusy(address.id);
     try {
       await api(`/addresses/${address.id}`, { method: "DELETE" });
@@ -40,6 +42,7 @@ export default function PatientAccountPage() {
       toast.error(errorMessage(err));
     } finally {
       setBusy(null);
+      setDeleting(null);
     }
   }
 
@@ -48,6 +51,7 @@ export default function PatientAccountPage() {
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader title="Account" />
       <ProfileForm />
+      <LanguageSwitch />
 
       <section>
         <SectionHeading
@@ -97,7 +101,7 @@ export default function PatientAccountPage() {
                     variant="dangerGhost"
                     icon="trash"
                     disabled={busy === address.id}
-                    onClick={() => remove(address)}
+                    onClick={() => setDeleting(address)}
                   >
                     Delete
                   </Button>
@@ -110,6 +114,18 @@ export default function PatientAccountPage() {
           )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => deleting && remove(deleting)}
+        loading={deleting !== null && busy === deleting.id}
+        title="Delete this address?"
+        description={deleting ? `"${deleting.label}" — ${addressLine(deleting)}` : undefined}
+        confirmLabel="Delete address"
+        cancelLabel="Keep it"
+        tone="danger"
+      />
     </div>
   );
 }

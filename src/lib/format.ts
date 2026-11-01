@@ -17,17 +17,41 @@ function fmt(iso: string | Date, options: Intl.DateTimeFormatOptions): string {
   );
 }
 
-/** "Mon, 27 Oct · 10:00 am" */
+/** "Today" / "Tomorrow" / "Yesterday" when the India-time date matches, else null. */
+function relativeDay(iso: string | Date): string | null {
+  const key = istDateKey(typeof iso === "string" ? new Date(iso) : iso);
+  const now = Date.now();
+  if (key === istDateKey(new Date(now))) return "Today";
+  if (key === istDateKey(new Date(now + 86_400_000))) return "Tomorrow";
+  if (key === istDateKey(new Date(now - 86_400_000))) return "Yesterday";
+  return null;
+}
+
+/** "Tue, 4 Nov · 10:30 AM", or "Today · 10:30 AM" where it applies. */
 export function formatDateTime(iso: string): string {
-  return `${fmt(iso, { weekday: "short", day: "numeric", month: "short" })} · ${formatTime(iso)}`;
+  return `${formatDate(iso)} · ${formatTime(iso)}`;
 }
 
-export function formatDate(iso: string | Date): string {
-  return fmt(iso, { weekday: "short", day: "numeric", month: "short" });
+/** "Tue, 4 Nov" — or "Today" / "Tomorrow". */
+export function formatDate(iso: string | Date, { relative = true }: { relative?: boolean } = {}): string {
+  return (relative && relativeDay(iso)) || fmt(iso, { weekday: "short", day: "numeric", month: "short" });
 }
 
+/** "10:30 AM" (India time). */
 export function formatTime(iso: string | Date): string {
-  return fmt(iso, { hour: "numeric", minute: "2-digit" });
+  return fmt(iso, { hour: "numeric", minute: "2-digit", hour12: true }).replace(/\b(am|pm)\b/i, (m) => m.toUpperCase());
+}
+
+/** "5 min ago", "3 h ago", "2 days ago", else the date. */
+export function timeAgo(iso: string, now = Date.now()): string {
+  const minutes = Math.round((now - Date.parse(iso)) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days} ${days === 1 ? "day" : "days"} ago`;
+  return formatDate(iso, { relative: false });
 }
 
 /** "YYYY-MM-DD" for a moment, in India time. */
@@ -52,11 +76,11 @@ export function durationLabel(minutes: number): string {
   return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} hr`;
 }
 
-/** "09:30" -> "9:30 am"; "23:59" -> "midnight". */
+/** "09:30" -> "9:30 AM"; "23:59" -> "midnight". */
 export function clockLabel(time: string): string {
   const [h, m] = time.split(":").map(Number);
   if (h === 23 && m === 59) return "midnight";
-  const suffix = h < 12 ? "am" : "pm";
+  const suffix = h < 12 ? "AM" : "PM";
   const hour = h % 12 === 0 ? 12 : h % 12;
   return m === 0 ? `${hour} ${suffix}` : `${hour}:${String(m).padStart(2, "0")} ${suffix}`;
 }
@@ -86,4 +110,15 @@ export function isValidIndianMobile(phone: string): boolean {
 export function displayPhone(e164: string): string {
   const match = /^\+91(\d{5})(\d{5})$/.exec(e164);
   return match ? `+91 ${match[1]} ${match[2]}` : e164;
+}
+
+/** A WhatsApp chat link for a support number ("+91 98xxx…" → https://wa.me/9198…). */
+export function whatsappLink(number: string, text?: string): string {
+  const digits = number.replace(/\D/g, "");
+  const full = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${full}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+}
+
+export function telLink(number: string): string {
+  return `tel:${number.replace(/[^\d+]/g, "")}`;
 }

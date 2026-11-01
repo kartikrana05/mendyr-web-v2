@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { PatientBookingRow } from "@/components/booking-cards";
-import { Alert, ButtonLink, Chip, EmptyState, PageHeader, PageSpinner } from "@/components/ui";
+import { Alert, ButtonLink, Chip, EmptyState, PageHeader, PageSkeleton } from "@/components/ui";
 import { ACTIVE_STATUSES } from "@/lib/constants";
 
 import { usePatientBookings } from "../patient-context";
@@ -39,7 +39,7 @@ export default function PatientBookingsPage() {
       {error ? (
         <Alert tone="error">{error.message}</Alert>
       ) : loading ? (
-        <PageSpinner />
+        <PageSkeleton />
       ) : shown.length === 0 ? (
         <EmptyState
           icon="calendar"

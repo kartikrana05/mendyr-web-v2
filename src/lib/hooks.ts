@@ -14,51 +14,75 @@ function toApiError(error: unknown): ApiError {
   return error instanceof ApiError ? error : new ApiError("Something went wrong.", 0, "unknown");
 }
 
+// Last good response per path, so returning to a screen shows its data instantly while it
+// refreshes in the background. Cleared on sign-out.
+const memory = new Map<string, unknown>();
+
+export function clearApiMemory() {
+  memory.clear();
+}
+
 /**
  * GET `path` and keep the result. Pass `null` to skip fetching (e.g. until a dependency is
- * ready). With `pollMs`, refetches on an interval while the page is visible — Next keeps
- * hidden routes mounted but runs their effect cleanups, so polling stops off-screen.
- * Refetches keep showing the previous data instead of flashing a spinner.
+ * ready). With `pollMs`, refetches on an interval while the tab is visible, and right away
+ * when it becomes visible again. Next keeps hidden routes mounted but runs their effect
+ * cleanups, so polling also stops off-screen. Refetches keep showing the previous (or
+ * remembered) data instead of flashing a skeleton.
  */
 export function useApi<T>(path: string | null, { pollMs }: { pollMs?: number } = {}) {
-  const [state, setState] = useState<State<T>>({ path });
+  const [state, setState] = useState<State<T>>(() => ({
+    path,
+    data: path ? (memory.get(path) as T | undefined) : undefined,
+  }));
   // Only the newest request may write state, so a slow older response can't win.
   const latest = useRef(0);
 
-  const fetchInto = useCallback(
-    (forPath: string) => {
-      const request = ++latest.current;
-      return api<T>(forPath).then(
-        (data) => {
-          if (request === latest.current) setState({ path: forPath, data });
-        },
-        (error: unknown) => {
-          if (request !== latest.current) return;
-          setState((previous) => ({
-            path: forPath,
-            data: previous.path === forPath ? previous.data : undefined,
-            error: toApiError(error),
-          }));
-        },
-      );
-    },
-    [],
-  );
+  const fetchInto = useCallback((forPath: string) => {
+    const request = ++latest.current;
+    return api<T>(forPath).then(
+      (data) => {
+        memory.set(forPath, data);
+        if (request === latest.current) setState({ path: forPath, data });
+      },
+      (error: unknown) => {
+        if (request !== latest.current) return;
+        setState((previous) => ({
+          path: forPath,
+          data: previous.path === forPath ? previous.data : (memory.get(forPath) as T | undefined),
+          error: toApiError(error),
+        }));
+      },
+    );
+  }, []);
 
   useEffect(() => {
     if (path === null) return;
     void fetchInto(path);
     if (!pollMs) return;
-    const timer = setInterval(() => void fetchInto(path), pollMs);
-    return () => clearInterval(timer);
+    const tick = () => {
+      if (document.visibilityState === "visible") void fetchInto(path);
+    };
+    const timer = setInterval(tick, pollMs);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [path, pollMs, fetchInto]);
 
   const reload = useCallback(async () => {
     if (path !== null) await fetchInto(path);
   }, [path, fetchInto]);
-  const mutate = useCallback((data: T) => setState({ path, data }), [path]);
+  const mutate = useCallback(
+    (data: T) => {
+      if (path !== null) memory.set(path, data);
+      setState({ path, data });
+    },
+    [path],
+  );
 
-  const current: State<T> = state.path === path ? state : { path };
+  const current: State<T> =
+    state.path === path ? state : { path, data: path ? (memory.get(path) as T | undefined) : undefined };
   return {
     data: current.data,
     error: current.error,

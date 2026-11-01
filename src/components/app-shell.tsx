@@ -6,8 +6,9 @@ import { useEffect } from "react";
 
 import { Logo } from "@/components/brand";
 import { Icon, type IconName } from "@/components/icons";
-import { Avatar, cn, PageSpinner } from "@/components/ui";
-import { homeFor, useAuth } from "@/lib/auth";
+import { Avatar, Button, cn, PageSkeleton } from "@/components/ui";
+import { homeFor, isStaff, useAuth } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 import type { Role } from "@/lib/types";
 
 export interface NavItem {
@@ -34,26 +35,76 @@ function NavBadge({ count, className }: { count?: number; className?: string }) 
   );
 }
 
+/** Shown to Mendyr team accounts (admin, super admin, ops): they work in the config portal. */
+export function StaffScreen() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const t = useT();
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
+      <Logo />
+      <div className="mt-8 w-full max-w-md rounded-(--radius-card) border border-slate-200 bg-white p-6 text-center shadow-xs">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+          <Icon name="shield" className="size-6" />
+        </span>
+        <h1 className="mt-4 text-xl font-bold text-slate-900">{t("staff.title")}</h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">{t("staff.body")}</p>
+        {user && (
+          <p className="mt-4 text-xs text-slate-500">
+            Signed in as {user.email ?? user.full_name} · {user.role.replace("_", " ")}
+          </p>
+        )}
+        <Button
+          className="mt-6 w-full"
+          variant="outline"
+          icon="logout"
+          onClick={async () => {
+            await logout();
+            router.replace("/login");
+          }}
+        >
+          {t("common.logout")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Lets only signed-in users with `role` through: anyone else goes to login (and comes back
- * to the same page, query string included, afterwards) or to their own area.
+ * to the same page, query string included, afterwards) or to their own area. Team accounts
+ * get a clear screen instead of a redirect loop.
  */
 export function RoleGate({ role, children }: { role: Role; children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const staff = user ? isStaff(user.role) : false;
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || staff) return;
     if (!user) {
       const here = window.location.pathname + window.location.search;
       router.replace(`/login?next=${encodeURIComponent(here)}`);
     } else if (user.role !== role) {
       router.replace(homeFor(user.role));
     }
-  }, [loading, user, role, router]);
+  }, [loading, user, role, router, staff]);
 
-  if (loading || !user || user.role !== role) return <PageSpinner />;
+  if (staff) return <StaffScreen />;
+  if (loading || !user || user.role !== role) return <ShellSkeleton />;
   return <>{children}</>;
+}
+
+/** The app frame with placeholder content — while the session check runs. */
+export function ShellSkeleton() {
+  return (
+    <div className="min-h-screen">
+      <div className="h-16 border-b border-slate-200/70 bg-white" />
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <PageSkeleton />
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -61,10 +112,20 @@ export function RoleGate({ role, children }: { role: Role; children: React.React
  * <Suspense> boundary — it reads the pathname (for the active tab), which suspends below
  * dynamic routes when Cache Components is on.
  */
-export function AppShell({ nav, children }: { nav: NavItem[]; children: React.ReactNode }) {
+export function AppShell({
+  nav,
+  bell,
+  children,
+}: {
+  nav: NavItem[];
+  /** The notifications bell, with its unread count. */
+  bell?: { href: string; count: number };
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const t = useT();
   const isActive = (item: NavItem) =>
     item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -95,14 +156,27 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: React.Re
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            {user && <Avatar name={user.full_name} size="sm" />}
+            {bell && (
+              <Link
+                href={bell.href}
+                aria-label={`${t("nav.notifications")}${bell.count ? ` (${bell.count} unread)` : ""}`}
+                className={cn(
+                  "relative inline-flex size-9 items-center justify-center rounded-lg transition-colors",
+                  pathname === bell.href ? "bg-brand-50 text-brand-800" : "text-slate-600 hover:bg-slate-100",
+                )}
+              >
+                <Icon name="bell" className="size-5" />
+                <NavBadge count={bell.count} className="absolute -right-0.5 -top-0.5" />
+              </Link>
+            )}
+            {user && <Avatar name={user.full_name} src={user.avatar_url} size="sm" />}
             <button
               type="button"
               onClick={handleLogout}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
             >
               <Icon name="logout" className="size-4" />
-              <span className="hidden md:inline">Log out</span>
+              <span className="hidden md:inline">{t("common.logout")}</span>
             </button>
           </div>
         </div>

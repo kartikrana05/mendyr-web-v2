@@ -7,9 +7,10 @@ import { useState } from "react";
 import { Icon } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/components/toast";
-import { Alert, Button, Card, Field, PageSpinner, Textarea } from "@/components/ui";
+import { Alert, Button, Card, Field, PageSkeleton, Textarea } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api";
 import { displayPhone, durationLabel, formatDateTime, formatINR, formatTime } from "@/lib/format";
+import { usePollMs } from "@/lib/config";
 import { useApi, useNow } from "@/lib/hooks";
 import type { ProBooking } from "@/lib/types";
 
@@ -73,7 +74,7 @@ export function ProBookingDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { data: booking, error, mutate } = useApi<ProBooking>(`/bookings/professional/${id}`, { pollMs: 30_000 });
+  const { data: booking, error, mutate } = useApi<ProBooking>(`/bookings/professional/${id}`, { pollMs: usePollMs("active_booking") });
   const [busy, setBusy] = useState<"start" | "release" | null>(null);
   const now = useNow();
 
@@ -87,7 +88,7 @@ export function ProBookingDetail() {
       </div>
     );
   }
-  if (!booking) return <PageSpinner />;
+  if (!booking) return <PageSkeleton />;
 
   const startsAt = Date.parse(booking.scheduled_start_at);
   const minutes = (Date.parse(booking.scheduled_end_at) - startsAt) / 60_000;
@@ -149,7 +150,7 @@ export function ProBookingDetail() {
           <Icon name="user" className="size-5 shrink-0 text-slate-400" />
           <div className="flex-1">
             <p className="text-sm font-medium text-slate-900">{booking.patient_name}</p>
-            <p className="text-sm text-slate-500">{displayPhone(booking.patient_phone)}</p>
+            <p className="text-sm text-slate-500">{booking.patient_phone ? displayPhone(booking.patient_phone) : booking.patient_ref}</p>
           </div>
           <a
             href={`tel:${booking.patient_phone}`}

@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { Icon } from "@/components/icons";
 import { RequestCard } from "@/components/pro-cards";
-import { Alert, Card, PageHeader, PageSpinner } from "@/components/ui";
+import { Alert, Card, PageHeader, PageSkeleton } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
 import type { AvailabilitySlot } from "@/lib/types";
 
@@ -33,7 +33,7 @@ export default function ProRequestsPage() {
       {requests.error ? (
         <Alert tone="error">{requests.error.message}</Alert>
       ) : requests.loading ? (
-        <PageSpinner />
+        <PageSkeleton />
       ) : requests.data && requests.data.length > 0 ? (
         <div className="space-y-3">
           {requests.data.map((request) => (

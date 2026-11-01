@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect } from "react";
 
 import { AppShell, type NavItem } from "@/components/app-shell";
+import { usePollMs } from "@/lib/config";
 import { useApi } from "@/lib/hooks";
 import type { BookingListItem } from "@/lib/types";
 
@@ -29,7 +30,7 @@ const PatientBookingsContext = createContext<MyBookings | null>(null);
  */
 export function PatientProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const bookings = useApi<BookingListItem[]>("/bookings?page_size=100", { pollMs: 15_000 });
+  const bookings = useApi<BookingListItem[]>("/bookings?page_size=100", { pollMs: usePollMs("lists") });
   const updates = useBookingUpdates(bookings.data);
   const { reload } = bookings;
 
