@@ -30,19 +30,36 @@ export function registrationLabel(type: ProfessionalType): string {
   }
 }
 
-type Tone = "gray" | "amber" | "blue" | "green" | "red" | "violet";
+type Tone = "gray" | "amber" | "brand" | "teal" | "green" | "red";
 
+// Status colours per the design contract: searching = warning, assigned/confirmed = primary,
+// en route / in progress = accent, completed = success, the rest slate/danger.
 export const STATUS: Record<BookingStatus, { label: string; tone: Tone }> = {
   created: { label: "Created", tone: "gray" },
-  searching: { label: "Finding a professional", tone: "amber" },
-  assigned: { label: "Confirmed", tone: "blue" },
-  confirmed: { label: "Confirmed", tone: "blue" },
-  en_route: { label: "On the way", tone: "violet" },
-  in_progress: { label: "Visit in progress", tone: "violet" },
+  searching: { label: "Finding professional", tone: "amber" },
+  assigned: { label: "Confirmed", tone: "brand" },
+  confirmed: { label: "Confirmed", tone: "brand" },
+  en_route: { label: "On the way", tone: "teal" },
+  in_progress: { label: "In progress", tone: "teal" },
   completed: { label: "Completed", tone: "green" },
-  cancelled: { label: "Cancelled", tone: "red" },
-  no_show: { label: "No-show", tone: "red" },
+  cancelled: { label: "Cancelled", tone: "gray" },
+  no_show: { label: "Missed", tone: "red" },
   failed: { label: "Not fulfilled", tone: "red" },
+};
+
+/** Who ended a booking, in words for the other side. */
+export const CANCELLED_BY_PATIENT_VIEW: Record<string, string> = {
+  patient: "You cancelled this booking",
+  professional: "Your professional cancelled",
+  admin: "Cancelled by Mendyr support",
+  system: "Cancelled automatically",
+};
+
+export const CANCELLED_BY_PRO_VIEW: Record<string, string> = {
+  patient: "The patient cancelled this booking",
+  professional: "You handed this booking back",
+  admin: "Cancelled by Mendyr support",
+  system: "Cancelled automatically",
 };
 
 /** Bookings that are still going to happen (or are happening). */
@@ -55,14 +72,26 @@ export const ACTIVE_STATUSES: BookingStatus[] = [
   "in_progress",
 ];
 
-export const CANCELLABLE_STATUSES: BookingStatus[] = [
-  "created",
-  "searching",
-  "assigned",
-  "confirmed",
-  "en_route",
-  "failed",
-];
+// The backend also accepts cancelling a `failed` booking, but there's nothing left to stop.
+export const CANCELLABLE_STATUSES: BookingStatus[] = ["created", "searching", "assigned", "confirmed", "en_route"];
+
+/** Statuses where a cancellation fee may apply (inside the free window). */
+export const FEE_STATUSES: BookingStatus[] = ["assigned", "confirmed", "en_route"];
+
+/** Still upcoming for the patient: active, and not a request whose time has passed. */
+export function isUpcoming(booking: { status: BookingStatus; scheduled_start_at: string }, now = Date.now()): boolean {
+  if (!ACTIVE_STATUSES.includes(booking.status)) return false;
+  // An open request past its time will be marked failed by the backend; don't keep it here.
+  if ((booking.status === "searching" || booking.status === "created") && Date.parse(booking.scheduled_start_at) < now) {
+    return false;
+  }
+  return true;
+}
+
+export const REVIEW_TAGS = {
+  good: ["On time", "Gentle & caring", "Professional", "Explained clearly", "Clean & hygienic"],
+  bad: ["Arrived late", "Rushed the visit", "Not polite", "Hygiene concerns", "Didn't explain"],
+};
 
 export const LANGUAGES = [
   "English",

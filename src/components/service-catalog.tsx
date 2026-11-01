@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 
 import { ProfessionIcon } from "@/components/brand";
 import { Icon } from "@/components/icons";
-import { Alert, ButtonLink, Card, Chip, cn } from "@/components/ui";
+import { RatingPill, ServiceImage } from "@/components/service-visual";
+import { Alert, Badge, ButtonLink, Chip, cn, Skeleton } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { PROFESSION_LABEL, PROFESSION_SERVICE_COPY } from "@/lib/constants";
 import { durationLabel, formatINR } from "@/lib/format";
@@ -34,11 +35,11 @@ export function serviceCopy(service: Service): string {
   return service.description ?? PROFESSION_SERVICE_COPY[service.required_professional_type];
 }
 
-function CatalogSkeleton({ count = 6 }: { count?: number }) {
+export function CatalogSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="h-44 animate-pulse rounded-2xl bg-slate-200/60" />
+        <Skeleton key={i} className="h-64 rounded-(--radius-card)" />
       ))}
     </div>
   );
@@ -56,9 +57,14 @@ export function ServiceShowcase() {
         <Link
           key={category.id}
           href={`/services#${category.slug}`}
-          className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
+          className="group rounded-(--radius-card) border border-slate-200 bg-white p-5 shadow-xs transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
         >
-          <ProfessionIcon type={services[0].required_professional_type} />
+          {category.icon_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- category art from the portal
+            <img src={category.icon_url} alt="" loading="lazy" className="size-11 rounded-xl object-cover" />
+          ) : (
+            <ProfessionIcon type={services[0].required_professional_type} />
+          )}
           <h3 className="mt-4 text-lg font-semibold text-slate-900">{category.name}</h3>
           <p className="mt-1 text-sm text-slate-500">
             {services.length} {services.length === 1 ? "service" : "services"} · from{" "}
@@ -80,27 +86,42 @@ export function ServiceShowcase() {
   );
 }
 
+/** A catalogue card: image, name, highlights, price — links to the service's own page. */
 export function ServiceCard({ service, action }: { service: Service; action?: React.ReactNode }) {
   return (
-    <Card className="flex flex-col p-5">
-      <div className="flex items-start gap-3">
-        <ProfessionIcon type={service.required_professional_type} />
-        <div className="min-w-0">
-          <h3 className="font-semibold leading-snug text-slate-900">{service.name}</h3>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">
-            {PROFESSION_LABEL[service.required_professional_type]} · {durationLabel(service.duration_minutes)}
+    <div className="group relative flex flex-col overflow-hidden rounded-(--radius-card) border border-slate-200/80 bg-white shadow-xs transition duration-200 ease-out hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md">
+      <div className="relative">
+        <ServiceImage service={service} className="aspect-[16/9] w-full" rounded="rounded-none" />
+        {service.badge && (
+          <Badge tone="brand" className="absolute left-3 top-3 bg-white/95 shadow-xs">
+            {service.badge}
+          </Badge>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold leading-snug text-slate-900">
+            <Link href={`/services/${service.id}`} className="after:absolute after:inset-0">
+              {service.name}
+            </Link>
+          </h3>
+          <RatingPill avg={service.rating_avg} count={service.rating_count} className="shrink-0 pt-0.5" />
+        </div>
+        <p className="mt-0.5 text-xs font-medium text-slate-500">
+          {PROFESSION_LABEL[service.required_professional_type]} · {durationLabel(service.duration_minutes)}
+        </p>
+        <p className="mt-2 line-clamp-2 flex-1 text-sm leading-relaxed text-slate-600">
+          {service.tagline ?? serviceCopy(service)}
+        </p>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p>
+            <span className="text-lg font-bold text-slate-900">{formatINR(service.base_price)}</span>
+            <span className="ml-1 text-xs text-slate-500">+ GST</span>
           </p>
+          {action && <div className="relative z-10">{action}</div>}
         </div>
       </div>
-      <p className="mt-3 flex-1 text-sm leading-relaxed text-slate-600">{serviceCopy(service)}</p>
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <p>
-          <span className="text-lg font-bold text-slate-900">{formatINR(service.base_price)}</span>
-          <span className="ml-1 text-xs text-slate-500">+ GST</span>
-        </p>
-        {action}
-      </div>
-    </Card>
+    </div>
   );
 }
 

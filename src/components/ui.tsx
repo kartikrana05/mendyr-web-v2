@@ -243,7 +243,7 @@ export function Card({ className, children }: { className?: string; children: Re
   );
 }
 
-type Tone = "gray" | "amber" | "blue" | "green" | "red" | "violet" | "brand" | "dark";
+type Tone = "gray" | "amber" | "blue" | "green" | "red" | "violet" | "brand" | "teal" | "dark";
 
 const BADGE_TONES: Record<Tone, string> = {
   gray: "bg-slate-100 text-slate-700",
@@ -253,6 +253,7 @@ const BADGE_TONES: Record<Tone, string> = {
   red: "bg-red-100 text-red-700",
   violet: "bg-violet-100 text-violet-800",
   brand: "bg-brand-100 text-brand-800",
+  teal: "bg-teal-50 text-teal-800",
   dark: "bg-white/10 text-brand-200", // on dark backgrounds
 };
 

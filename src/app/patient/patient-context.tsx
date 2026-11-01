@@ -4,18 +4,21 @@ import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect } from "react";
 
 import { AppShell, type NavItem } from "@/components/app-shell";
+import { InboxProvider } from "@/components/notifications";
 import { usePollMs } from "@/lib/config";
 import { useApi } from "@/lib/hooks";
+import { type Translate, useT } from "@/lib/i18n";
 import type { BookingListItem } from "@/lib/types";
 
 import { PatientAlerts, useBookingUpdates } from "./patient-alerts";
 
-function navFor(updates: number): NavItem[] {
+function navFor(updates: number, t: Translate): NavItem[] {
   return [
-    { href: "/patient", label: "Home", icon: "home", exact: true },
-    { href: "/patient/book", label: "Book", icon: "plus" },
-    { href: "/patient/bookings", label: "Bookings", icon: "calendar", badge: updates },
-    { href: "/patient/account", label: "Account", icon: "user" },
+    { href: "/patient", label: t("nav.home"), icon: "home", exact: true },
+    { href: "/patient/book", label: t("nav.book"), icon: "plus" },
+    { href: "/patient/bookings", label: t("nav.bookings"), icon: "calendar", badge: updates },
+    { href: "/patient/support", label: t("nav.help"), icon: "help" },
+    { href: "/patient/account", label: t("nav.account"), icon: "user" },
   ];
 }
 
@@ -30,6 +33,7 @@ const PatientBookingsContext = createContext<MyBookings | null>(null);
  */
 export function PatientProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const t = useT();
   const bookings = useApi<BookingListItem[]>("/bookings?page_size=100", { pollMs: usePollMs("lists") });
   const updates = useBookingUpdates(bookings.data);
   const { reload } = bookings;
@@ -41,10 +45,17 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PatientBookingsContext.Provider value={bookings}>
-      <AppShell nav={navFor(updates.confirmed.length + updates.dropped.length)}>
-        {children}
-        <PatientAlerts {...updates} />
-      </AppShell>
+      <InboxProvider>
+        {(unread) => (
+          <AppShell
+            nav={navFor(updates.confirmed.length + updates.dropped.length, t)}
+            bell={{ href: "/patient/notifications", count: unread }}
+          >
+            {children}
+            <PatientAlerts {...updates} />
+          </AppShell>
+        )}
+      </InboxProvider>
     </PatientBookingsContext.Provider>
   );
 }

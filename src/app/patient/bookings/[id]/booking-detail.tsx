@@ -4,88 +4,191 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
-import { BookingProgress } from "@/components/booking-cards";
+import { BookingTimeline } from "@/components/booking-timeline";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/modal";
 import { StatusBadge } from "@/components/status-badge";
+import { EmergencyCard } from "@/components/support";
 import { useToast } from "@/components/toast";
 import {
   Alert,
   Avatar,
+  Badge,
   Button,
+  ButtonLink,
   Card,
   Chip,
   cn,
   PageSkeleton,
-  Spinner,
   Stars,
   Textarea,
 } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api";
-import { ACTIVE_STATUSES, CANCELLABLE_STATUSES, PROFESSION_LABEL } from "@/lib/constants";
-import { displayPhone, durationLabel, formatDateTime, formatINR, formatTime } from "@/lib/format";
-import { usePollMs } from "@/lib/config";
-import { useApi } from "@/lib/hooks";
+import {
+  ACTIVE_STATUSES,
+  CANCELLABLE_STATUSES,
+  CANCELLED_BY_PATIENT_VIEW,
+  FEE_STATUSES,
+  PROFESSION_LABEL,
+  REVIEW_TAGS,
+} from "@/lib/constants";
+import { useConfig, useFeature, usePollMs, useRules } from "@/lib/config";
+import { displayPhone, durationLabel, formatDateTime, formatINR, telLink } from "@/lib/format";
+import { useApi, useNow } from "@/lib/hooks";
+import { useT } from "@/lib/i18n";
 import type { Booking } from "@/lib/types";
 
-const CANCEL_REASONS = ["Plans changed", "Booked by mistake", "Found care elsewhere", "Taking too long"];
+const HERO_TONES: Record<string, string> = {
+  searching: "border-amber-200 bg-amber-50 text-amber-900",
+  created: "border-amber-200 bg-amber-50 text-amber-900",
+  assigned: "border-brand-200 bg-brand-50 text-brand-900",
+  confirmed: "border-brand-200 bg-brand-50 text-brand-900",
+  en_route: "border-teal-200 bg-teal-50 text-teal-900",
+  in_progress: "border-teal-200 bg-teal-50 text-teal-900",
+  completed: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  cancelled: "border-slate-200 bg-slate-50 text-slate-800",
+  failed: "border-red-200 bg-red-50 text-red-900",
+  no_show: "border-red-200 bg-red-50 text-red-900",
+};
 
-function StatusMessage({ booking }: { booking: Booking }) {
-  const name = booking.professional?.full_name.split(" ")[0];
-  switch (booking.status) {
-    case "searching":
-      return new Date(booking.scheduled_start_at) < new Date() ? (
-        <Alert tone="warning" title="No one accepted this request in time">
-          Cancel it and book another time — earlier slots usually get picked up faster.
-        </Alert>
-      ) : (
-        <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <Spinner className="mt-0.5 size-4 shrink-0" />
-          <div>
-            <p className="font-semibold">Finding a professional near you</p>
-            <p className="mt-0.5">
-              Your request is with professionals in your area who are free at this time. You&apos;ll
-              see who&apos;s coming here as soon as someone accepts.
-            </p>
-          </div>
+/** The big "where things stand" card at the top. */
+function StatusHero({ booking }: { booking: Booking }) {
+  const t = useT();
+  const name = booking.professional?.full_name.split(" ")[0] ?? "Your professional";
+  const live = ACTIVE_STATUSES.includes(booking.status);
+  const sub: Record<string, string> = {
+    searching: "Your request is with verified professionals near you who are free at this time.",
+    created: "Your request is with verified professionals near you who are free at this time.",
+    assigned: `Arriving ${formatDateTime(booking.scheduled_start_at)}. You'll see when they set off.`,
+    confirmed: `Arriving ${formatDateTime(booking.scheduled_start_at)}. You'll see when they set off.`,
+    en_route: "They've set off for your address.",
+    in_progress: "Your professional has started the visit.",
+    completed: "Thank you for choosing Mendyr.",
+    failed: t("detail.failedBody"),
+    no_show: "This visit didn't happen. Contact support if you need help.",
+    cancelled: booking.cancelled_by ? CANCELLED_BY_PATIENT_VIEW[booking.cancelled_by] : "",
+  };
+  return (
+    <div className={cn("rounded-(--radius-card) border p-5", HERO_TONES[booking.status])}>
+      <div className="flex items-center gap-2">
+        {live && (
+          <span className="relative flex size-2.5">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-50" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-current" />
+          </span>
+        )}
+        <p className="text-lg font-semibold">{t(`status.${booking.status}`, { name })}</p>
+      </div>
+      {sub[booking.status] && <p className="mt-1 text-sm opacity-80">{sub[booking.status]}</p>}
+      {booking.status === "cancelled" && booking.cancellation_reason && (
+        <p className="mt-1 text-sm opacity-80">Reason: {booking.cancellation_reason}</p>
+      )}
+    </div>
+  );
+}
+
+function VisitPinCard({ pin }: { pin: string }) {
+  const t = useT();
+  return (
+    <Card className="flex items-center gap-4 border-brand-200 p-5">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+        <Icon name="lock" className="size-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-slate-900">{t("detail.visitPin")}</p>
+        <p className="mt-0.5 text-xs text-slate-500">{t("detail.visitPinBody")}</p>
+      </div>
+      <p className="font-display text-3xl font-bold tracking-[0.3em] text-slate-900" aria-label={`PIN ${pin.split("").join(" ")}`}>
+        {pin}
+      </p>
+    </Card>
+  );
+}
+
+function ProfessionalCard({ booking }: { booking: Booking }) {
+  const t = useT();
+  const pro = booking.professional;
+  if (!pro) return null;
+  if (booking.contact_hidden) {
+    return (
+      <Card className="flex items-center gap-4 p-5">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+          <Icon name="user" className="size-5" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Professional {pro.user_ref}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{t("detail.privacy")}</p>
         </div>
-      );
-    case "assigned":
-    case "confirmed":
-    case "en_route":
-      return (
-        <Alert tone="success" title={`${name} will visit at ${formatTime(booking.scheduled_start_at)}`}>
-          You can call them if you need to share anything before the visit.
-        </Alert>
-      );
-    case "in_progress":
-      return <Alert tone="info" title="Visit in progress" />;
-    case "completed":
-      return <Alert tone="success" title="Visit completed">Thank you for using Mendyr.</Alert>;
-    case "cancelled":
-      return (
-        <Alert tone="error" title="Booking cancelled">
-          {booking.cancellation_reason}
-        </Alert>
-      );
-    default:
-      return null;
+      </Card>
+    );
   }
+  return (
+    <Card className="p-5">
+      <div className="flex items-center gap-4">
+        <Avatar name={pro.full_name} src={pro.avatar_url} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+            {pro.full_name}
+            {pro.is_verified && (
+              <Badge tone="green">
+                <Icon name="shield" className="size-3.5" /> {t("common.verified")}
+              </Badge>
+            )}
+          </p>
+          <p className="text-sm text-slate-500">
+            {PROFESSION_LABEL[pro.professional_type]} · {t("common.yrsExp", { years: pro.years_of_experience })}
+          </p>
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+            {pro.total_ratings > 0 ? (
+              <>
+                <Stars value={pro.average_rating} /> {pro.average_rating.toFixed(1)} ({pro.total_ratings})
+              </>
+            ) : (
+              t("common.new")
+            )}
+          </p>
+        </div>
+        {pro.phone_number && ACTIVE_STATUSES.includes(booking.status) && (
+          <a
+            href={telLink(pro.phone_number)}
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.97] hover:bg-brand-700"
+            title={displayPhone(pro.phone_number)}
+          >
+            <Icon name="phone" className="size-4" /> {t("detail.call")}
+          </a>
+        )}
+      </div>
+      {!!pro.languages_spoken?.length && (
+        <p className="mt-3 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-sm text-slate-600">
+          <Icon name="globe" className="size-4 text-slate-400" /> Speaks {pro.languages_spoken.join(", ")}
+        </p>
+      )}
+    </Card>
+  );
 }
 
 function ReviewForm({ bookingId, onDone }: { bookingId: string; onDone: () => void }) {
   const toast = useToast();
+  const t = useT();
   const [rating, setRating] = useState(0);
+  const [tags, setTags] = useState<string[]>([]);
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const options = rating >= 4 ? REVIEW_TAGS.good : REVIEW_TAGS.bad;
 
   async function submit() {
     setSaving(true);
     try {
       await api("/reviews", {
         method: "POST",
-        body: { booking_id: bookingId, rating, comment: comment.trim() || null },
+        body: {
+          booking_id: bookingId,
+          rating,
+          comment: comment.trim() || null,
+          tags: tags.filter((tag) => options.includes(tag)),
+        },
       });
-      toast.success("Thanks for your feedback!");
+      toast.success(t("detail.rateThanks"));
       onDone();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -96,7 +199,7 @@ function ReviewForm({ bookingId, onDone }: { bookingId: string; onDone: () => vo
 
   return (
     <Card className="p-5">
-      <h2 className="font-semibold text-slate-900">How was your visit?</h2>
+      <h2 className="font-semibold text-slate-900">{t("detail.rate")}</h2>
       <div className="mt-3 flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
@@ -104,20 +207,33 @@ function ReviewForm({ bookingId, onDone }: { bookingId: string; onDone: () => vo
             type="button"
             aria-label={`${n} star${n > 1 ? "s" : ""}`}
             onClick={() => setRating(n)}
-            className="rounded p-0.5"
+            className="rounded p-0.5 transition active:scale-90"
           >
-            <Icon
-              name="star"
-              className={cn("size-8", n <= rating ? "fill-amber-400 text-amber-400" : "text-slate-300")}
-            />
+            <Icon name="star" className={cn("size-8", n <= rating ? "fill-amber-400 text-amber-400" : "text-slate-300")} />
           </button>
         ))}
       </div>
       {rating > 0 && (
-        <div className="mt-3 space-y-3">
+        <div className="mt-4 space-y-4">
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700">
+              {rating >= 4 ? "What went well?" : "What could have been better?"}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {options.map((tag) => (
+                <Chip
+                  key={tag}
+                  selected={tags.includes(tag)}
+                  onClick={() => setTags((current) => (current.includes(tag) ? current.filter((x) => x !== tag) : [...current, tag]))}
+                >
+                  {tag}
+                </Chip>
+              ))}
+            </div>
+          </div>
           <Textarea
             rows={2}
-            placeholder="Anything you'd like to share? (optional)"
+            placeholder="Anything else you'd like to share? (optional)"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
@@ -130,21 +246,43 @@ function ReviewForm({ bookingId, onDone }: { bookingId: string; onDone: () => vo
   );
 }
 
-function CancelPanel({ booking, onCancelled }: { booking: Booking; onCancelled: (b: Booking) => void }) {
+function CancelModal({
+  booking,
+  open,
+  onClose,
+  onCancelled,
+}: {
+  booking: Booking;
+  open: boolean;
+  onClose: () => void;
+  onCancelled: (b: Booking) => void;
+}) {
   const toast = useToast();
-  const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState(CANCEL_REASONS[0]);
+  const t = useT();
+  const reasons = useConfig("booking.cancel_reasons").patient;
+  const rules = useRules();
+  const now = useNow();
+  const [reason, setReason] = useState<string | null>(null);
+  const [other, setOther] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const minutesToStart = (Date.parse(booking.scheduled_start_at) - now) / 60_000;
+  const feeApplies =
+    FEE_STATUSES.includes(booking.status) &&
+    minutesToStart < rules.free_cancel_window_minutes &&
+    rules.cancellation_fee_pct > 0;
+  const fee = Math.round(booking.total_amount * rules.cancellation_fee_pct) / 100;
+  const isOther = reason === "Other";
+  const finalReason = isOther ? other.trim() || "Other" : reason;
+
   async function cancel() {
+    if (!finalReason) return;
     setSaving(true);
     try {
-      const updated = await api<Booking>(`/bookings/${booking.id}/cancel`, {
-        method: "POST",
-        body: { reason },
-      });
+      const updated = await api<Booking>(`/bookings/${booking.id}/cancel`, { method: "POST", body: { reason: finalReason } });
       toast.success("Booking cancelled.");
       onCancelled(updated);
+      onClose();
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -152,42 +290,67 @@ function CancelPanel({ booking, onCancelled }: { booking: Booking; onCancelled: 
     }
   }
 
-  if (!open) {
-    return (
-      <Button variant="dangerGhost" onClick={() => setOpen(true)}>
-        Cancel booking
-      </Button>
-    );
-  }
   return (
-    <Card className="p-5">
-      <h2 className="font-semibold text-slate-900">Cancel this booking?</h2>
-      <p className="mt-1 text-sm text-slate-500">Tell us why — it helps us improve.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {CANCEL_REASONS.map((r) => (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t("detail.cancelTitle")}
+      description="Tell us why — it helps us improve."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            {t("detail.keep")}
+          </Button>
+          <Button variant="danger" onClick={cancel} loading={saving} disabled={!reason}>
+            {t("detail.confirmCancel")}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        {reasons.map((r) => (
           <Chip key={r} selected={reason === r} onClick={() => setReason(r)}>
             {r}
           </Chip>
         ))}
       </div>
-      <div className="mt-4 flex gap-3">
-        <Button variant="danger" loading={saving} onClick={cancel}>
-          Yes, cancel
-        </Button>
-        <Button variant="ghost" onClick={() => setOpen(false)}>
-          Keep booking
-        </Button>
-      </div>
-    </Card>
+      {isOther && (
+        <Textarea
+          className="mt-3"
+          rows={2}
+          maxLength={500}
+          placeholder="Tell us a little more (optional)"
+          value={other}
+          onChange={(e) => setOther(e.target.value)}
+        />
+      )}
+      <p
+        className={cn(
+          "mt-4 rounded-xl px-3 py-2.5 text-sm",
+          feeApplies ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800",
+        )}
+      >
+        {feeApplies
+          ? t("detail.cancelFee", {
+              pct: rules.cancellation_fee_pct,
+              amount: formatINR(fee),
+              minutes: rules.free_cancel_window_minutes,
+            })
+          : t("detail.cancelFree")}
+      </p>
+    </Modal>
   );
 }
 
 export function PatientBookingDetail() {
   const { id } = useParams<{ id: string }>();
-  const [live, setLive] = useState(true);
+  const t = useT();
+  const reviewsOn = useFeature("reviews");
   const activeMs = usePollMs("active_booking");
+  const [cancelling, setCancelling] = useState(false);
+  const [live, setLive] = useState(true);
   // Poll while something can still change on the other side (a professional accepting,
-  // starting or completing the visit).
+  // setting off, starting or completing the visit).
   const { data: booking, error, mutate, reload } = useApi<Booking>(`/bookings/${id}`, {
     pollMs: live ? activeMs : undefined,
   });
@@ -206,16 +369,20 @@ export function PatientBookingDetail() {
   }
   if (!booking) return <PageSkeleton />;
 
-  const pro = booking.professional;
   const minutes = (Date.parse(booking.scheduled_end_at) - Date.parse(booking.scheduled_start_at)) / 60_000;
+  const ended = ["completed", "cancelled", "failed", "no_show"].includes(booking.status);
+  const proName = booking.professional?.full_name.split(" ")[0] ?? "your professional";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <Link href="/patient/bookings" className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800">
-        <Icon name="chevronLeft" className="size-4" /> My bookings
+    <div className="mx-auto max-w-5xl">
+      <Link
+        href="/patient/bookings"
+        className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"
+      >
+        <Icon name="chevronLeft" className="size-4" /> {t("bookings.title")}
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{booking.service_name_snapshot}</h1>
           <p className="mt-1 text-sm text-slate-500">Booking {booking.booking_code}</p>
@@ -223,105 +390,142 @@ export function PatientBookingDetail() {
         <StatusBadge status={booking.status} />
       </div>
 
-      <BookingProgress status={booking.status} />
-      <StatusMessage booking={booking} />
+      <div className="mt-5 grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-5">
+          <StatusHero booking={booking} />
+          {booking.visit_pin && <VisitPinCard pin={booking.visit_pin} />}
+          <ProfessionalCard booking={booking} />
 
-      {pro && (
-        <Card className="flex items-center gap-4 p-5">
-          <Avatar name={pro.full_name} size="lg" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-slate-900">{pro.full_name}</p>
-            <p className="text-sm text-slate-500">
-              {PROFESSION_LABEL[pro.professional_type]} · {pro.years_of_experience} yrs experience
-            </p>
-            <p className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-              {pro.total_ratings > 0 ? (
-                <>
-                  <Stars value={pro.average_rating} /> {pro.average_rating.toFixed(1)}
-                </>
-              ) : (
-                "New on Mendyr"
+          {(booking.visit_summary_notes || booking.vitals_recorded) && (
+            <Card className="p-5">
+              <h2 className="font-semibold text-slate-900">{t("detail.summary")}</h2>
+              {booking.vitals_recorded && (
+                <div className="mt-3 rounded-xl bg-teal-50/70 p-3.5">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-teal-800">
+                    <Icon name="activity" className="size-4" /> {t("detail.vitals")}
+                  </p>
+                  <p className="mt-1.5 whitespace-pre-line text-sm text-slate-800">{booking.vitals_recorded}</p>
+                </div>
               )}
-              {pro.languages_spoken?.length ? ` · ${pro.languages_spoken.join(", ")}` : null}
-            </p>
-          </div>
-          {!booking.contact_hidden && pro.phone_number && (
-            <a
-              href={`tel:${pro.phone_number}`}
-              className="flex shrink-0 items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
-              title={displayPhone(pro.phone_number)}
-            >
-              <Icon name="phone" className="size-4" /> Call
-            </a>
+              {booking.visit_summary_notes && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t("detail.notesFrom", { name: proName })}
+                  </p>
+                  <p className="mt-1.5 whitespace-pre-line text-sm text-slate-700">{booking.visit_summary_notes}</p>
+                </div>
+              )}
+            </Card>
           )}
-        </Card>
-      )}
 
-      <Card className="divide-y divide-slate-100">
-        <div className="flex gap-3 p-4">
-          <Icon name="calendar" className="mt-0.5 size-5 shrink-0 text-slate-400" />
-          <div>
-            <p className="text-sm font-medium text-slate-900">{formatDateTime(booking.scheduled_start_at)}</p>
-            <p className="text-sm text-slate-500">{durationLabel(minutes)} visit · India time</p>
-          </div>
-        </div>
-        <div className="flex gap-3 p-4">
-          <Icon name="pin" className="mt-0.5 size-5 shrink-0 text-slate-400" />
-          <p className="text-sm text-slate-700">{booking.address_snapshot}</p>
-        </div>
-        {booking.patient_notes && (
-          <div className="flex gap-3 p-4">
-            <Icon name="list" className="mt-0.5 size-5 shrink-0 text-slate-400" />
-            <p className="whitespace-pre-line text-sm text-slate-700">{booking.patient_notes}</p>
-          </div>
-        )}
-      </Card>
+          {booking.status === "completed" &&
+            reviewsOn &&
+            (booking.review_rating ? (
+              <Card className="flex items-center justify-between p-5">
+                <p className="text-sm font-medium text-slate-700">{t("detail.yourRating")}</p>
+                <Stars value={booking.review_rating} />
+              </Card>
+            ) : (
+              <ReviewForm bookingId={booking.id} onDone={reload} />
+            ))}
 
-      {booking.visit_summary_notes && (
-        <Card className="p-5">
-          <h2 className="font-semibold text-slate-900">Visit notes from {pro?.full_name.split(" ")[0] ?? "your professional"}</h2>
-          <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{booking.visit_summary_notes}</p>
-        </Card>
-      )}
-
-      <Card className="p-5">
-        <h2 className="font-semibold text-slate-900">Payment</h2>
-        <dl className="mt-3 space-y-2 text-sm">
-          <div className="flex justify-between text-slate-600">
-            <dt>Visit charge</dt>
-            <dd>{formatINR(booking.base_price)}</dd>
-          </div>
-          {booking.discount_amount > 0 && (
-            <div className="flex justify-between text-emerald-700">
-              <dt>Discount</dt>
-              <dd>−{formatINR(booking.discount_amount)}</dd>
+          <Card className="divide-y divide-slate-100">
+            <div className="flex gap-3 p-4">
+              <Icon name="calendar" className="mt-0.5 size-5 shrink-0 text-slate-400" />
+              <div>
+                <p className="text-sm font-medium text-slate-900">{formatDateTime(booking.scheduled_start_at)}</p>
+                <p className="text-sm text-slate-500">
+                  {durationLabel(minutes)} visit · {t("common.ist")}
+                </p>
+              </div>
             </div>
-          )}
-          <div className="flex justify-between text-slate-600">
-            <dt>GST</dt>
-            <dd>{formatINR(booking.tax_amount)}</dd>
-          </div>
-          <div className="flex justify-between border-t border-slate-100 pt-2 font-bold text-slate-900">
-            <dt>Total</dt>
-            <dd>{formatINR(booking.total_amount)}</dd>
-          </div>
-        </dl>
-        {booking.status !== "cancelled" && (
-          <p className="mt-3 text-xs text-slate-500">Paid after the visit — nothing is charged online.</p>
-        )}
-      </Card>
-
-      {booking.status === "completed" &&
-        (booking.review_rating ? (
-          <Card className="flex items-center justify-between p-5">
-            <p className="text-sm font-medium text-slate-700">Your rating</p>
-            <Stars value={booking.review_rating} />
+            <div className="flex gap-3 p-4">
+              <Icon name="pin" className="mt-0.5 size-5 shrink-0 text-slate-400" />
+              {booking.contact_hidden ? (
+                <p className="text-sm text-slate-500">{t("detail.privacy")}</p>
+              ) : (
+                <p className="text-sm text-slate-700">{booking.address_snapshot}</p>
+              )}
+            </div>
+            {booking.preferred_gender === "female" && (
+              <div className="flex gap-3 p-4">
+                <Icon name="female" className="mt-0.5 size-5 shrink-0 text-slate-400" />
+                <p className="text-sm text-slate-700">Female professional requested</p>
+              </div>
+            )}
+            {booking.patient_notes && (
+              <div className="flex gap-3 p-4">
+                <Icon name="list" className="mt-0.5 size-5 shrink-0 text-slate-400" />
+                <p className="whitespace-pre-line text-sm text-slate-700">{booking.patient_notes}</p>
+              </div>
+            )}
           </Card>
-        ) : (
-          <ReviewForm bookingId={booking.id} onDone={reload} />
-        ))}
 
-      {CANCELLABLE_STATUSES.includes(booking.status) && <CancelPanel booking={booking} onCancelled={mutate} />}
+          <Card className="p-5">
+            <h2 className="font-semibold text-slate-900">{t("detail.payment")}</h2>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between text-slate-600">
+                <dt>{t("book.visitCharge")}</dt>
+                <dd>{formatINR(booking.base_price)}</dd>
+              </div>
+              {booking.discount_amount > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <dt>{t("book.discount")}</dt>
+                  <dd>−{formatINR(booking.discount_amount)}</dd>
+                </div>
+              )}
+              <div className="flex justify-between text-slate-600">
+                <dt>{t("book.gst")}</dt>
+                <dd>{formatINR(booking.tax_amount)}</dd>
+              </div>
+              <div className="flex justify-between border-t border-slate-100 pt-2 font-bold text-slate-900">
+                <dt>{t("book.total")}</dt>
+                <dd>{formatINR(booking.base_price - booking.discount_amount + booking.tax_amount)}</dd>
+              </div>
+              {booking.cancellation_fee_amount > 0 && (
+                <div className="flex justify-between text-amber-800">
+                  <dt>Cancellation fee</dt>
+                  <dd>{formatINR(booking.cancellation_fee_amount)}</dd>
+                </div>
+              )}
+            </dl>
+            {!ended && (
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                <Icon name="wallet" className="size-3.5" /> {t("common.payAfter")}
+              </p>
+            )}
+          </Card>
+
+          <div className="flex flex-wrap gap-3">
+            {ended && (
+              <ButtonLink href={`/patient/book?service=${booking.service_id}`} icon="refresh">
+                {t("detail.bookAgain")}
+              </ButtonLink>
+            )}
+            {CANCELLABLE_STATUSES.includes(booking.status) && (
+              <Button variant="dangerGhost" onClick={() => setCancelling(true)}>
+                {t("detail.cancel")}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-5 lg:sticky lg:top-24">
+          <Card className="p-5">
+            <h2 className="mb-4 font-semibold text-slate-900">{t("detail.timeline")}</h2>
+            <BookingTimeline status={booking.status} timeline={booking.timeline} createdAt={booking.created_at} />
+          </Card>
+          {!ended && <EmergencyCard compact />}
+          <Link
+            href="/patient/support"
+            className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+          >
+            <Icon name="help" className="size-4" /> Need help with this booking?
+          </Link>
+        </div>
+      </div>
+
+      <CancelModal booking={booking} open={cancelling} onClose={() => setCancelling(false)} onCancelled={mutate} />
     </div>
   );
 }

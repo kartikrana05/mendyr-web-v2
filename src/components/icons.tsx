@@ -95,6 +95,60 @@ const PATHS = {
     </>
   ),
   inbox: <path d="M3 13h5l2 3h4l2-3h5M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z" />,
+  message: <path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12zM8.5 12h.01M12 12h.01M15.5 12h.01" />,
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </>
+  ),
+  siren: <path d="M7 18v-6a5 5 0 0 1 10 0v6M5 21h14v-3H5zM12 3v1M4.2 6.2l.7.7M19.8 6.2l-.7.7M2 12h1M21 12h1" />,
+  ambulance: (
+    <>
+      <path d="M3 17V7a1 1 0 0 1 1-1h10v11M14 10h4l3 3.5V17h-2M3 17h2M9 17h6M7 9v4M5 11h4" />
+      <circle cx="7" cy="17.5" r="1.8" />
+      <circle cx="17" cy="17.5" r="1.8" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" />
+    </>
+  ),
+  chevronDown: <path d="m6 9 6 6 6-6" />,
+  refresh: <path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4" />,
+  wallet: (
+    <>
+      <path d="M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z" />
+      <path d="M16 14.5h.01" />
+    </>
+  ),
+  female: (
+    <>
+      <circle cx="12" cy="9" r="5" />
+      <path d="M12 14v7M9 18h6" />
+    </>
+  ),
+  route: (
+    <>
+      <circle cx="6" cy="19" r="2" />
+      <circle cx="18" cy="5" r="2" />
+      <path d="M8 19h8a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h8" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof PATHS;
