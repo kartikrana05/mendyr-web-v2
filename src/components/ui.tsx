@@ -43,7 +43,7 @@ const SIZES: Record<Size, string> = {
   lg: "h-12 px-6 text-base gap-2",
 };
 
-function buttonClasses(variant: Variant, size: Size, className?: string) {
+export function buttonClasses(variant: Variant, size: Size, className?: string) {
   return cn(
     "inline-flex items-center justify-center rounded-xl font-semibold transition duration-150 ease-out active:scale-[0.97]",
     "focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",

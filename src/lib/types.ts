@@ -168,6 +168,8 @@ export interface Booking {
   completed_at: string | null;
   contact_hidden: boolean;
   timeline: StatusEvent[];
+  /** Prescriptions/reports the patient attached. */
+  documents?: MedicalDocument[];
   created_at: string;
 }
 
@@ -214,6 +216,8 @@ export interface BookingRequest {
   earning_amount: number;
   patient_notes: string | null;
   preferred_gender: string | null;
+  /** A prescription/report is attached — its contents are visible only after accepting. */
+  has_documents?: boolean;
   created_at: string;
 }
 
@@ -244,6 +248,8 @@ export interface ProBooking {
   cancelled_by: CancelledBy | null;
   requires_visit_pin: boolean;
   contact_hidden: boolean;
+  /** The patient's attached documents — filled only while the visit is live. */
+  documents?: MedicalDocument[];
   created_at: string;
 }
 
@@ -291,4 +297,51 @@ export interface AppNotification {
 export interface NotificationInbox {
   items: AppNotification[];
   unread_count: number;
+}
+
+// ── Documents ────────────────────────────────────────────────────────────
+// `view_url`s are presigned links that expire within minutes: open them straight away and
+// refetch the list for fresh ones — never keep one around.
+
+/** A presigned PUT for one file: send the bytes to `upload_url` with exactly `headers`. */
+export interface UploadTicket {
+  upload_url: string;
+  file_key: string;
+  method: string;
+  headers: Record<string, string>;
+  expires_in: number;
+}
+
+export type ProDocumentType =
+  | "government_id"
+  | "nursing_council_certificate"
+  | "degree_certificate"
+  | "police_verification"
+  | "profile_photo"
+  | "address_proof";
+
+/** A professional's KYC document and where its review stands. */
+export interface ProfessionalDocument {
+  id: string;
+  document_type: ProDocumentType;
+  verification_status: VerificationStatus;
+  rejection_reason: string | null;
+  content_type: string | null;
+  view_url: string;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export type MedicalDocumentType = "prescription" | "lab_report" | "referral" | "other";
+
+/** A patient's prescription, report or referral. */
+export interface MedicalDocument {
+  id: string;
+  document_type: MedicalDocumentType;
+  title: string | null;
+  booking_id: string | null;
+  content_type: string;
+  size_bytes: number;
+  view_url: string;
+  created_at: string;
 }
