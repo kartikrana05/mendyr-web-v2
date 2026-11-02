@@ -10,12 +10,14 @@ import { useToast } from "@/components/toast";
 import { Badge, Button, Card, cn } from "@/components/ui";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { durationLabel, formatDate, formatDateTime, formatINR, formatTime } from "@/lib/format";
+import { useT } from "@/lib/i18n";
 import type { BookingRequest, ProBooking } from "@/lib/types";
 
 /** An open request: what, when, roughly where, and what they'd earn — with Accept. */
 export function RequestCard({ request, onGone }: { request: BookingRequest; onGone: () => void }) {
   const router = useRouter();
   const toast = useToast();
+  const t = useT();
   const [accepting, setAccepting] = useState(false);
   const minutes = (Date.parse(request.scheduled_end_at) - Date.parse(request.scheduled_start_at)) / 60_000;
 
@@ -50,6 +52,11 @@ export function RequestCard({ request, onGone }: { request: BookingRequest; onGo
                 <Icon name="female" className="size-3.5" /> Female professional requested
               </Badge>
             )}
+            {request.has_documents && (
+              <Badge tone="teal">
+                <Icon name="file" className="size-3.5" /> {t("pro.prescriptionAttached")}
+              </Badge>
+            )}
           </div>
           <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600">
             <Icon name="calendar" className="size-4 text-slate-400" />
@@ -69,7 +76,10 @@ export function RequestCard({ request, onGone }: { request: BookingRequest; onGo
         <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">&ldquo;{request.patient_notes}&rdquo;</p>
       )}
       <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="text-xs text-slate-500">Full address and contact are shared once you accept.</p>
+        <p className="text-xs text-slate-500">
+          Full address and contact are shared once you accept.
+          {request.has_documents && <> {t("pro.docsAfterAccept")}</>}
+        </p>
         <Button onClick={accept} loading={accepting} icon="check">
           Accept
         </Button>

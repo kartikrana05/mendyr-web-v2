@@ -11,11 +11,12 @@ import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useConfig } from "@/lib/config";
 import { ACTIVE_STATUSES, PROFESSION_LABEL } from "@/lib/constants";
+import { KYC_PATH, kycGaps, proDocumentLabel } from "@/lib/documents";
 import { summariseEarnings } from "@/lib/earnings";
 import { formatINR, whatsappLink } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
 import { useT } from "@/lib/i18n";
-import type { AvailabilitySlot, ProfessionalProfile } from "@/lib/types";
+import type { AvailabilitySlot, ProfessionalDocument, ProfessionalProfile } from "@/lib/types";
 
 import { useMyBookings, useOpenRequests, useProfessional } from "./professional-context";
 
@@ -50,7 +51,11 @@ function VerificationBanner({ profile }: { profile: ProfessionalProfile }) {
       return (
         <Alert tone="info" title="Your profile is waiting for verification">
           Our team checks every professional before their first visit — usually within 1–2 working days. You&apos;ll
-          start seeing requests as soon as you&apos;re approved. Meanwhile, set your{" "}
+          start seeing requests as soon as you&apos;re approved. Meanwhile, upload your{" "}
+          <Link href="/pro/documents" className="font-semibold underline">
+            documents
+          </Link>
+          , set your{" "}
           <Link href="/pro/schedule" className="font-semibold underline">
             timings
           </Link>{" "}
@@ -71,12 +76,40 @@ function VerificationBanner({ profile }: { profile: ProfessionalProfile }) {
       return (
         <Alert tone="error" title="Your profile wasn't approved">
           {profile.rejection_reason ? <>Reason: {profile.rejection_reason}. </> : null}
-          Update your details in your profile, or {contact} to ask for another review.
+          Update your details in your{" "}
+          <Link href="/pro/profile" className="font-semibold underline">
+            profile
+          </Link>{" "}
+          and{" "}
+          <Link href="/pro/documents" className="font-semibold underline">
+            documents
+          </Link>
+          , or {contact} to ask for another review.
         </Alert>
       );
     default:
       return null;
   }
+}
+
+/** Nudges an unverified professional to upload missing or rejected verification documents. */
+function DocumentsNudge() {
+  const t = useT();
+  const required = useConfig("pro.settings").required_documents;
+  const docs = useApi<ProfessionalDocument[]>(KYC_PATH);
+  if (!docs.data) return null;
+  const { missing, rejected } = kycGaps(docs.data, required);
+  if (missing.length === 0 && rejected.length === 0) return null;
+  const names = (types: string[]) => types.map((type) => proDocumentLabel(type, t)).join(", ");
+  return (
+    <Alert tone={rejected.length > 0 ? "error" : "warning"} title={t("kyc.nudgeTitle")}>
+      {missing.length > 0 && <p>{t("kyc.nudgeMissing", { list: names(missing) })}</p>}
+      {rejected.length > 0 && <p>{t("kyc.nudgeRejected", { list: names(rejected) })}</p>}
+      <Link href="/pro/documents" className="mt-1 inline-block font-semibold underline">
+        {t("kyc.nudgeCta")}
+      </Link>
+    </Alert>
+  );
 }
 
 export default function ProDashboardPage() {
@@ -136,6 +169,7 @@ export default function ProDashboardPage() {
       </div>
 
       <VerificationBanner profile={profile} />
+      {!approved && <DocumentsNudge />}
 
       <Card className={cn("flex items-center justify-between gap-4 p-5", profile.is_accepting_bookings && approved && "border-emerald-200")}>
         <div className="flex items-center gap-3">

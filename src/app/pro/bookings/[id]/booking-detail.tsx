@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { MedicalDocumentRow } from "@/components/documents";
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/modal";
 import { StatusBadge } from "@/components/status-badge";
@@ -373,6 +374,18 @@ export function ProBookingDetail() {
           </p>
         )}
       </Card>
+
+      {!hidden && !!booking.documents?.length && (
+        <Card className="p-5">
+          <h2 className="font-semibold text-slate-900">{t("pro.patientDocs")}</h2>
+          <p className="mt-0.5 text-sm text-slate-500">{t("pro.patientDocsBody")}</p>
+          <div className="mt-2 divide-y divide-slate-100">
+            {booking.documents.map((doc) => (
+              <MedicalDocumentRow key={doc.id} doc={doc} />
+            ))}
+          </div>
+        </Card>
+      )}
 
       {startable && (
         <Card className="p-5">

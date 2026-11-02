@@ -14,6 +14,7 @@ import { useConfig } from "@/lib/config";
 import { PROFESSION_LABEL, registrationLabel } from "@/lib/constants";
 import { formatINR } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
+import { useT } from "@/lib/i18n";
 import type { MyService, ProfessionalProfile } from "@/lib/types";
 
 import { useProfessional } from "../professional-context";
@@ -192,7 +193,7 @@ const VERIFICATION = {
   approved: { tone: "green", label: "Verified", body: "Patients see a Verified badge on your profile." },
   pending: { tone: "amber", label: "Awaiting verification", body: "Our team will review your profile shortly." },
   in_review: { tone: "blue", label: "Under review", body: "We're checking your details now." },
-  rejected: { tone: "red", label: "Not approved", body: "Update your details or contact support for another review." },
+  rejected: { tone: "red", label: "Not approved", body: "Update your details and documents, or contact support for another review." },
 } as const;
 
 function VerificationStatus() {
@@ -217,10 +218,20 @@ function VerificationStatus() {
 }
 
 export default function ProProfilePage() {
+  const t = useT();
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="Profile" />
       <VerificationStatus />
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <h2 className="font-semibold text-slate-900">{t("kyc.profileCard")}</h2>
+          <p className="mt-0.5 text-sm text-slate-500">{t("kyc.profileCardBody")}</p>
+        </div>
+        <ButtonLink href="/pro/documents" variant="outline" icon="file">
+          {t("kyc.manage")}
+        </ButtonLink>
+      </Card>
       <ProfileForm />
       <ProfessionalDetails />
       <ServiceArea />
