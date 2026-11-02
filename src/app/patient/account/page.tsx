@@ -8,13 +8,17 @@ import { LanguageSwitch } from "@/components/language-switch";
 import { ConfirmDialog } from "@/components/modal";
 import { ProfileForm } from "@/components/profile-form";
 import { useToast } from "@/components/toast";
-import { Badge, Button, Card, PageHeader, SectionHeading } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, PageHeader, SectionHeading } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api";
+import { useFeature } from "@/lib/config";
 import { useApi } from "@/lib/hooks";
+import { useT } from "@/lib/i18n";
 import type { Address } from "@/lib/types";
 
 export default function PatientAccountPage() {
   const toast = useToast();
+  const t = useT();
+  const documentsOn = useFeature("prescription_upload");
   const addresses = useApi<Address[]>("/addresses");
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -51,6 +55,17 @@ export default function PatientAccountPage() {
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader title="Account" />
       <ProfileForm />
+      {documentsOn && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <div>
+            <h2 className="font-semibold text-slate-900">{t("mdocs.title")}</h2>
+            <p className="mt-0.5 text-sm text-slate-500">{t("mdocs.accountBody")}</p>
+          </div>
+          <ButtonLink href="/patient/documents" variant="outline" icon="file">
+            {t("mdocs.title")}
+          </ButtonLink>
+        </Card>
+      )}
       <LanguageSwitch />
 
       <section>

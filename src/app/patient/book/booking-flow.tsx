@@ -4,18 +4,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { AddressForm, addressLine } from "@/components/address-form";
+import { DocumentChooser, MedicalUploadForm } from "@/components/documents";
 import { Icon, type IconName } from "@/components/icons";
 import { serviceCopy, useCatalog } from "@/components/service-catalog";
 import { RatingPill, ServiceImage } from "@/components/service-visual";
 import { useToast } from "@/components/toast";
 import { Alert, Badge, Button, Card, Chip, cn, Input, Skeleton, Switch, Textarea } from "@/components/ui";
-import { api, errorMessage, query } from "@/lib/api";
-import { type BookingRules, useFeature, useRules } from "@/lib/config";
+import { api, ApiError, errorMessage, query } from "@/lib/api";
+import { type BookingRules, useConfigRefresh, useFeature, useRules } from "@/lib/config";
 import { PROFESSION_LABEL } from "@/lib/constants";
+import { VIEW_URL_REFRESH_MS } from "@/lib/documents";
 import { durationLabel, formatDateTime, formatINR, istDateKey, istIso, MARKET_TZ } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
 import { type Translate, useT } from "@/lib/i18n";
-import type { Address, Booking, NearbyProfessional, Quote, Service } from "@/lib/types";
+import type { Address, Booking, MedicalDocument, NearbyProfessional, Quote, Service } from "@/lib/types";
 
 // ── Slots, from `booking.rules` (the server enforces the same lead time and horizon) ──
 
@@ -220,6 +222,8 @@ export function BookingFlow() {
   const t = useT();
   const rules = useRules();
   const genderPref = useFeature("gender_preference");
+  const docsOn = useFeature("prescription_upload");
+  const refreshConfig = useConfigRefresh();
   const { groups } = useCatalog();
   const services = useMemo(() => groups?.flatMap((g) => g.services) ?? [], [groups]);
 
@@ -244,6 +248,15 @@ export function BookingFlow() {
   const [pickedTime, setPickedTime] = useState<string | null>(null);
   const time = pickedTime && slots.includes(pickedTime) ? pickedTime : null;
   const scheduledAt = dateKey && time ? istIso(dateKey, time) : null;
+
+  // Prescriptions/reports to attach: only ones not already on another booking.
+  const myDocs = useApi<MedicalDocument[]>(docsOn ? "/medical-documents" : null, { pollMs: VIEW_URL_REFRESH_MS });
+  const freeDocs = (myDocs.data ?? []).filter((d) => d.booking_id === null);
+  const [docIds, setDocIds] = useState<string[]>([]);
+  const chosenDocs = docsOn ? freeDocs.filter((d) => docIds.includes(d.id)) : [];
+  const [uploadingNew, setUploadingNew] = useState(false);
+  const needsPrescription = docsOn && !!service?.requires_prescription;
+  const hasPrescription = chosenDocs.some((d) => d.document_type === "prescription");
 
   const [preferFemale, setPreferFemale] = useState(false);
   const [notes, setNotes] = useState("");
@@ -278,7 +291,7 @@ export function BookingFlow() {
   );
 
   const done = (index: number) =>
-    [!!service, !!scheduledAt, !!address, true, false][index] ?? false;
+    [!!service, !!scheduledAt, !!address, !needsPrescription || hasPrescription, false][index] ?? false;
   const canContinue = done(step);
 
   function go(index: number) {
@@ -299,16 +312,26 @@ export function BookingFlow() {
           scheduled_start_at: scheduledAt,
           patient_notes: notes.trim() || null,
           ...(genderPref ? { preferred_gender: preferFemale ? "female" : null } : {}),
+          ...(chosenDocs.length ? { document_ids: chosenDocs.map((d) => d.id) } : {}),
         },
       });
       toast.success(t("book.success"));
       // This page stays mounted (hidden) after navigating away; leave it fresh for next time.
       setPickedTime(null);
       setNotes("");
+      setDocIds([]);
+      setUploadingNew(false);
       setStep(0);
       router.push(`/patient/bookings/${booking.id}`);
     } catch (err) {
-      setError(errorMessage(err));
+      if (err instanceof ApiError && err.code === "prescription_required") {
+        // The service needs a prescription (our copy of the flags may have been stale).
+        toast.error(err.message);
+        void refreshConfig();
+        go(3);
+      } else {
+        setError(errorMessage(err));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -522,6 +545,50 @@ export function BookingFlow() {
 
           {current === "details" && (
             <div className="space-y-5">
+              {docsOn && (
+                <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                      <Icon name="file" className="size-4 text-brand-600" /> {t("book.docs.title")}
+                      {!needsPrescription && <span className="font-normal text-slate-400">(optional)</span>}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">{t("book.docs.body")}</p>
+                  </div>
+                  {needsPrescription && !hasPrescription && service && (
+                    <Alert tone="warning">{t("book.docs.required", { service: service.name })}</Alert>
+                  )}
+                  {myDocs.loading && <Skeleton className="h-14" />}
+                  {freeDocs.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("book.docs.saved")}</p>
+                      <DocumentChooser
+                        docs={freeDocs}
+                        selected={docIds}
+                        onToggle={(id) =>
+                          setDocIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]))
+                        }
+                      />
+                    </div>
+                  )}
+                  {uploadingNew || (myDocs.data !== undefined && freeDocs.length === 0) ? (
+                    <div className="rounded-xl bg-slate-50 p-4">
+                      <MedicalUploadForm
+                        onUploaded={(doc) => {
+                          myDocs.mutate([doc, ...(myDocs.data ?? [])]);
+                          setDocIds((current) => [...current, doc.id]);
+                          setUploadingNew(false);
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    myDocs.data !== undefined && (
+                      <Button variant="ghost" size="sm" icon="plus" onClick={() => setUploadingNew(true)}>
+                        {t("book.docs.uploadNew")}
+                      </Button>
+                    )
+                  )}
+                </div>
+              )}
               {genderPref && (
                 <div className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 p-4">
                   <div>
@@ -565,6 +632,15 @@ export function BookingFlow() {
                 {genderPref && preferFemale && (
                   <div className="flex items-center gap-3 p-3.5 text-sm text-slate-800">
                     <Icon name="female" className="size-4 text-slate-400" /> Female professional preferred
+                  </div>
+                )}
+                {chosenDocs.length > 0 && (
+                  <div className="flex items-center gap-3 p-3.5 text-sm text-slate-800">
+                    <Icon name="file" className="size-4 shrink-0 text-slate-400" />
+                    <span className="min-w-0 flex-1">{t("book.docs.count", { count: chosenDocs.length })}</span>
+                    <button type="button" onClick={() => go(3)} className="text-sm font-semibold text-brand-700">
+                      Change
+                    </button>
                   </div>
                 )}
                 {notes.trim() && (

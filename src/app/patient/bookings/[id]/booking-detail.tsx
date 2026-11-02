@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 
 import { BookingTimeline } from "@/components/booking-timeline";
+import { DocumentChooser, MedicalDocumentRow, MedicalUploadForm } from "@/components/documents";
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/modal";
 import { StatusBadge } from "@/components/status-badge";
@@ -19,11 +20,12 @@ import {
   Card,
   Chip,
   cn,
+  ListSkeleton,
   PageSkeleton,
   Stars,
   Textarea,
 } from "@/components/ui";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage, query } from "@/lib/api";
 import {
   ACTIVE_STATUSES,
   CANCELLABLE_STATUSES,
@@ -33,10 +35,11 @@ import {
   REVIEW_TAGS,
 } from "@/lib/constants";
 import { useConfig, useFeature, usePollMs, useRules } from "@/lib/config";
+import { VIEW_URL_REFRESH_MS } from "@/lib/documents";
 import { displayPhone, durationLabel, formatDateTime, formatINR, telLink } from "@/lib/format";
 import { useApi, useNow } from "@/lib/hooks";
 import { useT } from "@/lib/i18n";
-import type { Booking } from "@/lib/types";
+import type { Booking, BookingStatus, MedicalDocument } from "@/lib/types";
 
 const HERO_TONES: Record<string, string> = {
   searching: "border-amber-200 bg-amber-50 text-amber-900",
@@ -342,10 +345,163 @@ function CancelModal({
   );
 }
 
+// The backend lets documents be attached (or removed) until the visit is over.
+const DOCUMENTS_EDITABLE: BookingStatus[] = ["searching", "assigned", "confirmed", "en_route", "in_progress"];
+
+function AttachDocumentsModal({
+  bookingId,
+  open,
+  onClose,
+  onDone,
+}: {
+  bookingId: string;
+  open: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const t = useT();
+  const toast = useToast();
+  const all = useApi<MedicalDocument[]>(open ? "/medical-documents" : null);
+  const free = (all.data ?? []).filter((d) => d.booking_id === null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  async function attach() {
+    setSaving(true);
+    try {
+      for (const id of selected) {
+        await api(`/medical-documents/${id}`, { method: "PATCH", body: { booking_id: bookingId } });
+      }
+      toast.success(t("detail.docsAttached"));
+      setSelected([]);
+      onDone();
+    } catch (err) {
+      toast.error(errorMessage(err));
+      onDone(); // some may have gone through
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t("detail.docsAttachTitle")}
+      description={t("detail.docsBody")}
+      size="lg"
+      footer={
+        free.length > 0 ? (
+          <>
+            <Button variant="ghost" onClick={onClose} disabled={saving}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={attach} loading={saving} disabled={selected.length === 0}>
+              {t("detail.docsAttachSelected")}
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
+      {all.loading ? (
+        <ListSkeleton rows={2} />
+      ) : free.length > 0 ? (
+        <DocumentChooser
+          docs={free}
+          selected={selected}
+          onToggle={(id) => setSelected((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]))}
+        />
+      ) : (
+        <p className="text-sm text-slate-500">{t("detail.docsNoneSaved")}</p>
+      )}
+      <div className="mt-5 border-t border-slate-100 pt-5">
+        <p className="mb-3 text-sm font-semibold text-slate-900">{t("book.docs.uploadNew")}</p>
+        <MedicalUploadForm
+          bookingId={bookingId}
+          onUploaded={() => {
+            toast.success(t("detail.docsAttached"));
+            onDone();
+          }}
+        />
+      </div>
+    </Modal>
+  );
+}
+
+/** Prescriptions/reports on this booking; more can be attached (or removed) while it's upcoming. */
+function BookingDocuments({ booking }: { booking: Booking }) {
+  const t = useT();
+  const toast = useToast();
+  // Its own list (not `booking.documents`) so view links stay fresh after polling stops.
+  const attached = useApi<MedicalDocument[]>(`/medical-documents${query({ booking_id: booking.id })}`, {
+    pollMs: VIEW_URL_REFRESH_MS,
+  });
+  const editable = DOCUMENTS_EDITABLE.includes(booking.status);
+  const [attaching, setAttaching] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const list = attached.data ?? booking.documents ?? [];
+  if (!editable && list.length === 0) return null;
+
+  async function detach(doc: MedicalDocument) {
+    setBusy(doc.id);
+    try {
+      await api(`/medical-documents/${doc.id}`, { method: "PATCH", body: { booking_id: null } });
+      await attached.reload();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-slate-900">{t("detail.docs")}</h2>
+          <p className="mt-0.5 text-sm text-slate-500">{t("detail.docsBody")}</p>
+        </div>
+        {editable && (
+          <Button size="sm" variant="secondary" icon="plus" onClick={() => setAttaching(true)}>
+            {t("detail.docsAttach")}
+          </Button>
+        )}
+      </div>
+      {list.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-500">{t("detail.docsEmpty")}</p>
+      ) : (
+        <div className="mt-2 divide-y divide-slate-100">
+          {list.map((doc) => (
+            <MedicalDocumentRow key={doc.id} doc={doc}>
+              {editable && (
+                <Button size="sm" variant="ghost" disabled={busy === doc.id} onClick={() => detach(doc)}>
+                  {t("detail.docsRemove")}
+                </Button>
+              )}
+            </MedicalDocumentRow>
+          ))}
+        </div>
+      )}
+      {editable && (
+        <AttachDocumentsModal
+          bookingId={booking.id}
+          open={attaching}
+          onClose={() => setAttaching(false)}
+          onDone={() => {
+            setAttaching(false);
+            void attached.reload();
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
 export function PatientBookingDetail() {
   const { id } = useParams<{ id: string }>();
   const t = useT();
   const reviewsOn = useFeature("reviews");
+  const documentsOn = useFeature("prescription_upload");
   const activeMs = usePollMs("active_booking");
   const [cancelling, setCancelling] = useState(false);
   const [live, setLive] = useState(true);
@@ -460,6 +616,8 @@ export function PatientBookingDetail() {
               </div>
             )}
           </Card>
+
+          {documentsOn && <BookingDocuments booking={booking} />}
 
           <Card className="p-5">
             <h2 className="font-semibold text-slate-900">{t("detail.payment")}</h2>

@@ -51,6 +51,7 @@ collected after the visit for now — nothing is charged online.
 | `/patient/book` | patient | Booking flow | `POST /bookings/quote`, `GET /professionals/nearby`, `POST /addresses`, `POST /bookings` |
 | `/patient/bookings[/id]` | patient | Track, cancel, rate | `GET /bookings/{id}`, `POST /bookings/{id}/cancel`, `POST /reviews` |
 | `/patient/account` | patient | Profile, saved addresses, language | `PATCH /users/me`, `/addresses` CRUD |
+| `/patient/documents` | patient (`prescription_upload` on) | Prescriptions, lab reports, referrals: upload, view, delete | `/medical-documents` (`upload-url`, `GET`, `POST`, `DELETE`) |
 | `/patient/notifications`, `/pro/notifications` | signed in | Inbox, unread bell | `GET /notifications`, `POST /notifications/read-all`, `…/{id}/read` |
 | `/patient/support`, `/pro/support` | signed in | Help, WhatsApp, SOS / ambulance, FAQs | config `app.support` |
 | `/pro/onboarding` | professional | First-time profile setup | `POST /professionals/onboard`, `PUT /professionals/me/availability/slots` |
@@ -61,6 +62,7 @@ collected after the visit for now — nothing is charged online.
 | `/pro/earnings` | professional | Today / week / month from completed visits | `GET /bookings/professional/mine` |
 | `/staff` | admin, ops | Points team accounts to the config portal | — |
 | `/pro/profile` | professional | Details, service area, services | `PATCH /professionals/me`, `/professionals/me/services` |
+| `/pro/documents` | professional | Verification documents: checklist, upload, re-upload, view, delete | `/professionals/me/documents` (`upload-url`, `GET`, `POST`, `DELETE`) |
 
 Address and service-area forms never ask for coordinates: "Use my current location" uses the
 browser's location, otherwise the backend geocodes the pincode (`GET /geo/locate`,
@@ -104,6 +106,25 @@ src/
     format.ts             money, India-time dates, phone numbers
     constants.ts          labels for professions, statuses, languages, states
 ```
+
+### Documents
+
+Files go straight from the browser to the storage bucket — never through the API
+(`src/lib/documents.ts`, `src/components/documents.tsx`):
+
+1. the file is checked (PDF/JPG/PNG/WEBP/HEIC, 10 MB) and big photos are re-encoded to a
+   ~2000px JPEG on a canvas;
+2. `POST …/upload-url` returns a presigned `PUT` URL; the file is `PUT` there with exactly the
+   returned headers (cross-origin, no cookies) — the bucket's CORS rules must allow this
+   site's origin;
+3. `POST …` records the `file_key`.
+
+`view_url`s expire in ~5 minutes, so lists that show them refetch every 4 minutes and links
+open them in a new tab straight away; they're never stored. Patients' documents (and the
+"Attach prescription / report" step when booking — required for services with
+`requires_prescription`) appear only while `app.features.prescription_upload` is on.
+Professionals see "Prescription attached" on requests and can open the files on the visit
+while it's live.
 
 All times are shown and picked in India time (`Asia/Kolkata`), even for someone booking from
 abroad. Styling is plain Tailwind; components take props (`variant`, `tone`, `size`) rather
